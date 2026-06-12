@@ -35,6 +35,10 @@ const extFor = mime => (mime.match(/audio\/(\w+)/) || [, 'bin'])[1]
 
 const MIC_KEY = 'fedwiki-media:micId'
 
+// Local Whisper endpoint (FedWiki Media Plan Phase 4, "local-whisper" provider).
+// Override with localStorage key fedwiki-media:transcribeUrl.
+const transcribeUrl = () => localStorage.getItem('fedwiki-media:transcribeUrl') || 'http://localhost:8000/transcribe'
+
 let audioContext
 let meterSource // keep a reference — Chrome GCs unreferenced MediaStreamAudioSourceNodes, silencing the meter
 
@@ -272,14 +276,66 @@ async function saveAndEmit($item, item, take, ui) {
     duration: take.duration,
     peakDb: take.peakDb,
     created: saved.sidecar.created,
+    audioItemId: audioItem.id,
   }
   const $page = $item.parents('.page:first')
   await putAndWait($page, { item: audioItem, id: audioItem.id, type: 'add', after: item.id })
   await putAndWait($page, { item, id: item.id, type: 'edit' })
+  ui.transcribe.disabled = false
 
   const quiet = take.peakDb < -30 ? ` — warning: quiet take (peak ${take.peakDb} dBFS)` : ''
   ui.status.textContent = `saved ${saved.filename} (${(take.blob.size / 1024).toFixed(0)} KB, ${take.duration}s)${quiet}`
   return { saved, audioItem }
+}
+
+// ---------- transcription (local Whisper provider) ----------
+
+async function transcribeRecording($item, item, ui) {
+  const rec = item.recording
+  if (!rec?.src) throw new Error('no saved recording to transcribe')
+  ui.status.textContent = 'transcribing… (first run downloads the model)'
+
+  const res = await fetch(transcribeUrl(), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url: `${location.origin}/${rec.src}` }),
+  })
+  if (!res.ok) throw new Error(`transcribe failed: ${res.status}`)
+  const transcript = await res.json()
+  if (transcript.error) throw new Error(transcript.error)
+
+  // save the transcript sidecar next to the recording
+  const $page = $item.parents('.page:first')
+  const slug = $page.attr('id')
+  const transcriptName = rec.filename.replace(/\.\w+$/, '.transcript.json')
+  const form = new FormData()
+  form.append('assets', slug)
+  form.append(
+    'file',
+    new File([new Blob([JSON.stringify(transcript, null, 2)], { type: 'application/json' })], transcriptName),
+  )
+  const up = await fetch('/plugin/assets/upload', { method: 'POST', body: form })
+  if (!up.ok) throw new Error(`transcript upload failed: ${up.status}`)
+
+  // add a markdown item with the transcript text, after the audio item if we know it
+  const mdItem = {
+    type: 'markdown',
+    id: randomId(),
+    text: `> ${transcript.text}\n\n*Transcript of ${rec.filename} — ${transcript.provider} (${transcript.model}), language ${transcript.language}.*`,
+  }
+  const afterId = rec.audioItemId || item.id
+  let $anchor = $page.find(`.item[data-id="${afterId}"]`)
+  if (!$anchor.length) $anchor = $item
+  const $new = $('<div />', { class: 'item markdown', 'data-id': mdItem.id }).data('item', mdItem).data('pageElement', $page)
+  $anchor.after($new)
+  wiki.doPlugin($new, mdItem)
+  await putAndWait($page, { item: mdItem, id: mdItem.id, type: 'add', after: $anchor.length && $anchor[0] !== $item[0] ? afterId : item.id })
+
+  item.recording.transcript = `assets/${slug}/${transcriptName}`
+  await putAndWait($page, { item, id: item.id, type: 'edit' })
+
+  ui.status.textContent = `transcribed — ${transcript.segments.length} segments, language ${transcript.language}`
+  return transcript
 }
 
 // ---------- item UI ----------
@@ -292,6 +348,7 @@ const html = item => `
       <button class="an-record">Record</button>
       <button class="an-stop" disabled>Stop</button>
       <button class="an-save" disabled>Save to Assets</button>
+      <button class="an-transcribe"${item.recording?.src ? '' : ' disabled'}>Transcribe</button>
     </div>
     <div style="font-size:.8em; color:#444; margin:4px 0;">
       <label><input type="checkbox" class="an-agc"> auto&nbsp;gain</label>
@@ -321,6 +378,7 @@ const getUI = $item => {
     record: el('.an-record'),
     stop: el('.an-stop'),
     save: el('.an-save'),
+    transcribe: el('.an-transcribe'),
     db: el('.an-db'),
     zone: el('.an-zone'),
     timer: el('.an-timer'),
@@ -403,6 +461,17 @@ const bind = ($item, item) => {
   }
 
   ui.stop.onclick = () => ui.stopFn?.()
+
+  ui.transcribe.onclick = async () => {
+    try {
+      ui.transcribe.disabled = true
+      await transcribeRecording($item, item, ui)
+    } catch (err) {
+      ui.status.textContent = 'error: ' + err.message
+    } finally {
+      ui.transcribe.disabled = !item.recording?.src
+    }
+  }
 
   ui.save.onclick = async () => {
     if (!take) return
