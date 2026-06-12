@@ -304,15 +304,20 @@ async function transcribeRecording($item, item, ui) {
   const transcript = await res.json()
   if (transcript.error) throw new Error(transcript.error)
 
-  // save the transcript sidecar next to the recording
+  // save JSON sidecar and plain-text transcript next to the recording
   const $page = $item.parents('.page:first')
   const slug = $page.attr('id')
   const transcriptName = rec.filename.replace(/\.\w+$/, '.transcript.json')
+  const transcriptTxtName = rec.filename.replace(/\.\w+$/, '.transcript.txt')
   const form = new FormData()
   form.append('assets', slug)
   form.append(
     'file',
     new File([new Blob([JSON.stringify(transcript, null, 2)], { type: 'application/json' })], transcriptName),
+  )
+  form.append(
+    'file',
+    new File([new Blob([transcript.text], { type: 'text/plain' })], transcriptTxtName),
   )
   const up = await fetch('/plugin/assets/upload', { method: 'POST', body: form })
   if (!up.ok) throw new Error(`transcript upload failed: ${up.status}`)
@@ -331,7 +336,26 @@ async function transcribeRecording($item, item, ui) {
   wiki.doPlugin($new, mdItem)
   await putAndWait($page, { item: mdItem, id: mdItem.id, type: 'add', after: $anchor.length && $anchor[0] !== $item[0] ? afterId : item.id })
 
+  // update the audio item's caption to [[Page Title]] - [txt-url filename]
+  if (rec.audioItemId) {
+    const pageTitle = $page.data('data')?.title || slug
+    const txtUrl = `${location.origin}/assets/${slug}/${transcriptTxtName}`
+    const newCaption = `[[${pageTitle}]] - [${txtUrl} ${transcriptTxtName}]`
+    const $audioEl = $page.find(`.item[data-id="${rec.audioItemId}"]`)
+    if ($audioEl.length) {
+      const audioItem = $audioEl.data('item')
+      if (audioItem?.text) {
+        const lines = audioItem.text.split('\n')
+        lines[1] = newCaption
+        audioItem.text = lines.join('\n')
+        $audioEl.data('item', audioItem)
+        await putAndWait($page, { item: audioItem, id: audioItem.id, type: 'edit' })
+      }
+    }
+  }
+
   item.recording.transcript = `assets/${slug}/${transcriptName}`
+  item.recording.transcriptTxt = `assets/${slug}/${transcriptTxtName}`
   await putAndWait($page, { item, id: item.id, type: 'edit' })
 
   ui.status.textContent = `transcribed — ${transcript.segments.length} segments, language ${transcript.language}`
