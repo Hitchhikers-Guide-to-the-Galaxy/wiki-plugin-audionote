@@ -45,8 +45,14 @@ const levelZone = db => {
   return ['no signal — wrong microphone?', '#c0392b']
 }
 
+const AGC_KEY = 'fedwiki-media:agc'
+const GAIN_KEY = 'fedwiki-media:gainDb'
+
+const storedAgc = () => localStorage.getItem(AGC_KEY) !== 'off'
+const storedGainDb = () => +(localStorage.getItem(GAIN_KEY) || 0)
+
 const micConstraints = () => {
-  const audio = { autoGainControl: true, echoCancellation: true, noiseSuppression: true }
+  const audio = { autoGainControl: storedAgc(), echoCancellation: true, noiseSuppression: true }
   const micId = localStorage.getItem(MIC_KEY)
   if (micId) audio.deviceId = { exact: micId }
   return { audio }
@@ -74,22 +80,44 @@ async function fillMicSelect(select) {
 
 // ---------- recording with level meter ----------
 
-function recordStream(stream, ui, { maxSeconds = 600, label }) {
+function recordStream(stream, ui, { maxSeconds = 600, label, gainDb = 0 }) {
   return new Promise((resolve, reject) => {
     const mime = bestMime()
     if (!mime) return reject(new Error('No supported MediaRecorder audio type'))
 
-    const recorder = new MediaRecorder(stream, { mimeType: mime })
     const chunks = []
     const startedAt = performance.now()
 
+    // device info from the original stream, before any gain wrapping
     const track = stream.getAudioTracks()[0]
-    const device = track ? { label: track.label, sampleRate: track.getSettings().sampleRate } : null
+    const settings = track ? track.getSettings() : {}
+    const device = track
+      ? { label: track.label, sampleRate: settings.sampleRate, autoGainControl: settings.autoGainControl }
+      : null
 
     audioContext ||= new AudioContext()
     const analyser = audioContext.createAnalyser()
-    meterSource = audioContext.createMediaStreamSource(stream)
-    meterSource.connect(analyser)
+
+    // Software gain: route through a GainNode and record the processed stream, so the
+    // gain is baked into the file. The meter taps post-gain — what you see is what saves.
+    // (Best fix for quiet input is still the OS input level in System Settings > Sound.)
+    let recStream = stream
+    if (gainDb !== 0) {
+      const source = audioContext.createMediaStreamSource(stream)
+      const gainNode = audioContext.createGain()
+      gainNode.gain.value = Math.pow(10, gainDb / 20)
+      const dest = audioContext.createMediaStreamDestination()
+      source.connect(gainNode)
+      gainNode.connect(dest)
+      gainNode.connect(analyser)
+      meterSource = { source, gainNode, dest } // hold refs — Chrome GCs unreferenced audio nodes
+      recStream = dest.stream
+    } else {
+      meterSource = audioContext.createMediaStreamSource(stream)
+      meterSource.connect(analyser)
+    }
+
+    const recorder = new MediaRecorder(recStream, { mimeType: mime })
 
     const ctx = ui.meter.getContext('2d')
     const wave = new Uint8Array(analyser.frequencyBinCount)
@@ -148,7 +176,7 @@ function recordStream(stream, ui, { maxSeconds = 600, label }) {
       stream.getTracks().forEach(t => t.stop())
       const blob = new Blob(chunks, { type: mime })
       const duration = +((performance.now() - startedAt) / 1000).toFixed(2)
-      resolve({ blob, mime, duration, peakDb: +maxPeakDb.toFixed(1), device, label })
+      resolve({ blob, mime, duration, peakDb: +maxPeakDb.toFixed(1), device, label, gainDb })
     }
 
     recorder.start()
@@ -174,6 +202,7 @@ async function saveRecording($item, item, take) {
     created: new Date().toISOString(),
     duration: take.duration,
     peakDb: take.peakDb,
+    gainDb: take.gainDb,
     device: take.device,
     source: take.label,
     participantId: null,
@@ -264,6 +293,11 @@ const html = item => `
       <button class="an-stop" disabled>Stop</button>
       <button class="an-save" disabled>Save to Assets</button>
     </div>
+    <div style="font-size:.8em; color:#444; margin:4px 0;">
+      <label><input type="checkbox" class="an-agc"> auto&nbsp;gain</label>
+      &nbsp; boost <input type="range" class="an-gain" min="0" max="24" step="1" value="0"
+        style="width:110px; vertical-align:middle;"> +<span class="an-gaindb">0</span>&nbsp;dB
+    </div>
     <div style="font-family:monospace; font-size:.85em; margin:4px 0;">
       peak <span class="an-db">–</span> dBFS <span class="an-zone"></span> <span class="an-timer"></span>
     </div>
@@ -280,6 +314,9 @@ const getUI = $item => {
   const el = sel => $item.find(sel)[0]
   return {
     mic: el('.an-mic'),
+    agc: el('.an-agc'),
+    gain: el('.an-gain'),
+    gaindb: el('.an-gaindb'),
     check: el('.an-check'),
     record: el('.an-record'),
     stop: el('.an-stop'),
@@ -306,6 +343,16 @@ const bind = ($item, item) => {
   fillMicSelect(ui.mic).catch(() => {})
   ui.mic.onchange = () => localStorage.setItem(MIC_KEY, ui.mic.value)
 
+  ui.agc.checked = storedAgc()
+  ui.agc.onchange = () => localStorage.setItem(AGC_KEY, ui.agc.checked ? 'on' : 'off')
+  ui.gain.value = storedGainDb()
+  ui.gaindb.textContent = ui.gain.value
+  ui.gain.oninput = () => {
+    ui.gaindb.textContent = ui.gain.value
+    localStorage.setItem(GAIN_KEY, ui.gain.value)
+  }
+  const currentGainDb = () => +ui.gain.value
+
   const setBusy = busy => {
     ui.record.disabled = busy
     ui.check.disabled = busy && !checkStream
@@ -331,7 +378,7 @@ const bind = ($item, item) => {
       const monitor = { meter: ui.meter, db: ui.db, zone: ui.zone, timer: ui.timer, stopFn: null }
       checkStream = { stream, monitor }
       // monitor without keeping the recording
-      recordStream(stream, monitor, { maxSeconds: 3600, label: 'mic-check' }).catch(() => {})
+      recordStream(stream, monitor, { maxSeconds: 3600, label: 'mic-check', gainDb: currentGainDb() }).catch(() => {})
     } catch (err) {
       ui.status.textContent = 'error: ' + err.message
     }
@@ -343,7 +390,7 @@ const bind = ($item, item) => {
       const stream = await navigator.mediaDevices.getUserMedia(micConstraints())
       await fillMicSelect(ui.mic)
       setBusy(true)
-      take = await recordStream(stream, ui, { maxSeconds: 600, label: 'microphone' })
+      take = await recordStream(stream, ui, { maxSeconds: 600, label: 'microphone', gainDb: currentGainDb() })
       ui.player.src = URL.createObjectURL(take.blob)
       ui.player.style.display = ''
       const quiet = take.peakDb < -30 ? ` — quiet take (peak ${take.peakDb} dBFS), check mic before saving` : ''
@@ -389,7 +436,7 @@ const bind = ($item, item) => {
     osc.start()
     setBusy(true)
     try {
-      const testTake = await recordStream(dest.stream, ui, { maxSeconds: seconds, label: 'self-test-oscillator' })
+      const testTake = await recordStream(dest.stream, ui, { maxSeconds: seconds, label: 'self-test-oscillator', gainDb: currentGainDb() })
       osc.stop()
       const { saved, audioItem } = await saveAndEmit($item, item, testTake, ui)
       return { take: { mime: testTake.mime, bytes: testTake.blob.size, duration: testTake.duration, peakDb: testTake.peakDb }, saved: saved.src, audioItem }
