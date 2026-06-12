@@ -1,0 +1,58 @@
+{
+  "title": "About Audio-Note Plugin",
+  "story": [
+    {
+      "type": "markdown",
+      "id": "a4d10e6b22c91f01",
+      "text": "The Audio Note plugin records a voice note in the browser and saves it into the wiki page's assets folder, then adds a native audio item to the page so the recording plays everywhere — even on sites without this plugin installed."
+    },
+    {
+      "type": "audio-note",
+      "id": "a4d10e6b22c91f02",
+      "text": "Try recording a note here."
+    },
+    {
+      "type": "markdown",
+      "id": "a4d10e6b22c91f03",
+      "text": "## How it works"
+    },
+    {
+      "type": "markdown",
+      "id": "a4d10e6b22c91f04",
+      "text": "Pick a microphone, click *Mic Check* to confirm the level on the dBFS meter, then *Record* (up to 10 minutes), preview, and *Save to Assets*. The audio file and a JSON metadata sidecar (duration, peak level, device, timestamps) are uploaded through the bundled assets endpoint into `assets/<page-slug>/`, and a native audio item appears below with an absolute URL so it survives forking. A take that never peaks above −30 dBFS gets a quiet-take warning before you save. Double-click the caption area to edit the caption used for the audio item."
+    }
+  ],
+  "journal": [
+    {
+      "type": "create",
+      "item": {
+        "title": "About Audio-Note Plugin",
+        "story": [
+          {
+            "type": "markdown",
+            "id": "a4d10e6b22c91f01",
+            "text": "The Audio Note plugin records a voice note in the browser and saves it into the wiki page's assets folder, then adds a native audio item to the page so the recording plays everywhere — even on sites without this plugin installed."
+          },
+          {
+            "type": "audio-note",
+            "id": "a4d10e6b22c91f02",
+            "text": "Try recording a note here."
+          },
+          {
+            "type": "markdown",
+            "id": "a4d10e6b22c91f03",
+            "text": "## How it works"
+          },
+          {
+            "type": "markdown",
+            "id": "a4d10e6b22c91f04",
+            "text": "Pick a microphone, click *Mic Check* to confirm the level on the dBFS meter, then *Record* (up to 10 minutes), preview, and *Save to Assets*. The audio file and a JSON metadata sidecar (duration, peak level, device, timestamps) are uploaded through the bundled assets endpoint into `assets/<page-slug>/`, and a native audio item appears below with an absolute URL so it survives forking. A take that never peaks above −30 dBFS gets a quiet-take warning before you save. Double-click the caption area to edit the caption used for the audio item."
+          }
+        ]
+      },
+      "date": 1781286000000,
+      "certificate": "from marvin"
+    }
+  ],
+  "plugin": "audio-note"
+}

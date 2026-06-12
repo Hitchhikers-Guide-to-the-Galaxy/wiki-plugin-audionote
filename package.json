@@ -1,0 +1,21 @@
+{
+  "name": "wiki-plugin-audio-note",
+  "version": "0.1.0",
+  "description": "Federated Wiki - Audio Note Plugin: record a voice note in the browser, save it into wiki assets, emit a native audio item",
+  "keywords": [
+    "audio",
+    "recorder",
+    "voice note",
+    "wiki",
+    "federated wiki",
+    "plugin"
+  ],
+  "author": {
+    "name": "David Bovill"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Hitchhikers-Guide-to-the-Galaxy/wiki-plugin-audio-note.git"
+  }
+}
