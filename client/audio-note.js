@@ -566,8 +566,11 @@ const bind = ($item, item) => {
   const slugFromDrop = dt => {
     const uri = dt.getData('text/uri-list') || ''
     const txt = dt.getData('text/plain') || ''
-    const url = (uri + ' ' + txt).match(/\/view\/([A-Za-z0-9-]+)/)
-    if (url) return url[1]
+    // A FedWiki page flag is a link whose href is the page's lineup URL
+    // (/view/welcome-visitors/view/<slug>) — the dragged page is the LAST /view/ segment,
+    // not the welcome-visitors context prefix at the front.
+    const views = [...(uri + ' ' + txt).matchAll(/\/view\/([A-Za-z0-9-]+)/g)]
+    if (views.length) return views[views.length - 1][1]
     const wl = txt.match(/\[\[([^\]]+)\]\]/)
     if (wl) return slugify(wl[1])
     try { const j = JSON.parse(txt); if (j?.title) return slugify(j.title) } catch {}
