@@ -35,6 +35,11 @@
       "type": "markdown",
       "id": "a4d10e6b22c91f07",
       "text": "Two ways to override the destination:\n\n- **Drag** a page link onto the **Saves to** banner to pin a destination (then *✕ unpin* to clear it).\n- **Type a command** in the caption. A `TARGET: Page Name` line — or a line that is just a `[[Page Link]]` — sets the destination. Command lines (first word ALL-CAPS with a colon, or a lone wikilink) are kept out of the spoken caption; every other line becomes the caption shown on the saved audio item. The command vocabulary is expected to grow."
+    },
+    {
+      "type": "markdown",
+      "id": "a4d10e6b22c91f08",
+      "text": "## Repositories\n\n- GitHub — https://github.com/Hitchhikers-Guide-to-the-Galaxy/wiki-plugin-audio-note\n- npm — https://www.npmjs.com/package/wiki-plugin-audio-note"
     }
   ],
   "journal": [
@@ -77,6 +82,11 @@
             "type": "markdown",
             "id": "a4d10e6b22c91f07",
             "text": "Two ways to override the destination:\n\n- **Drag** a page link onto the **Saves to** banner to pin a destination (then *✕ unpin* to clear it).\n- **Type a command** in the caption. A `TARGET: Page Name` line — or a line that is just a `[[Page Link]]` — sets the destination. Command lines (first word ALL-CAPS with a colon, or a lone wikilink) are kept out of the spoken caption; every other line becomes the caption shown on the saved audio item. The command vocabulary is expected to grow."
+          },
+          {
+            "type": "markdown",
+            "id": "a4d10e6b22c91f08",
+            "text": "## Repositories\n\n- GitHub — https://github.com/Hitchhikers-Guide-to-the-Galaxy/wiki-plugin-audio-note\n- npm — https://www.npmjs.com/package/wiki-plugin-audio-note"
           }
         ]
       },
