@@ -39,6 +39,87 @@ const MIC_KEY = 'fedwiki-media:micId'
 // Override with localStorage key fedwiki-media:transcribeUrl.
 const transcribeUrl = () => localStorage.getItem('fedwiki-media:transcribeUrl') || 'http://localhost:8000/transcribe'
 
+// ---------- target resolution (Option C: lineup scan + [[link]]/TARGET: override; Option D: item.target) ----------
+//
+// An audio-note records into a *target* page — "where the recording goes". Resolution order:
+//   1. item.target          — a page slug pinned by dragging a page onto the item (Option D)
+//   2. [[Page]] / TARGET:    — an explicit target named in the caption text       (Option C override)
+//   3. lineup scan           — the nearest *other* page open in the lineup         (Option C default)
+//   4. the recorder's own page (fallback, and the single-page common case)
+// A named target that isn't open in the lineup falls back to the own page for emission.
+
+const ownPage = $item => $item.parents('.page:first')
+
+const slugify = name =>
+  typeof wiki !== 'undefined' && wiki.asSlug
+    ? wiki.asSlug(name)
+    : name.replace(/\s/g, '-').replace(/[^A-Za-z0-9-]/g, '').toLowerCase()
+
+// An explicit target named in the caption: a [[Page Link]] or a "TARGET: Page Name" line.
+function captionTarget(text) {
+  if (!text) return null
+  const link = text.match(/\[\[([^\]]+)\]\]/)
+  if (link) return slugify(link[1])
+  const dsl = text.match(/^\s*TARGET:\s*(.+)$/im)
+  if (dsl) return slugify(dsl[1].trim())
+  return null
+}
+
+// Pages render as .page elements carrying their slug as id; DOM order is lineup order.
+const pageTitle = $page => $page.data('data')?.title || $page.attr('id')
+
+function findOpenPage(slug, $self) {
+  const matches = $('.page').filter((_, el) => $(el).attr('id') === slug)
+  if (!matches.length) return null
+  const notSelf = matches.filter((_, el) => el !== $self[0]) // same slug can be open twice
+  return (notSelf.length ? notSelf : matches).first()
+}
+
+function pageForSlug(slug, $self) {
+  if (!slug || slug === $self.attr('id')) return $self
+  return findOpenPage(slug, $self) || $self
+}
+
+// The nearest other open page, preferring the one to the right of the recorder in the lineup.
+function lineupScan($self) {
+  const pages = $('.page').toArray()
+  const i = pages.indexOf($self[0])
+  if (i === -1) return null
+  for (let j = i + 1; j < pages.length; j++) if (pages[j] !== $self[0]) return $(pages[j])
+  for (let j = i - 1; j >= 0; j--) if (pages[j] !== $self[0]) return $(pages[j])
+  return null
+}
+
+const targetInfo = ($page, source, extra = {}) => ({ $page, slug: $page.attr('id'), title: pageTitle($page), source, ...extra })
+
+function resolveTarget($item, item) {
+  const $self = ownPage($item)
+  const explicit = item.target || captionTarget(item.text)
+  if (explicit) {
+    const $page = findOpenPage(explicit, $self)
+    if ($page) return targetInfo($page, item.target ? 'pinned' : 'caption')
+    return targetInfo($self, 'self', { unresolved: explicit }) // named but not open
+  }
+  const $scanned = lineupScan($self)
+  if ($scanned) return targetInfo($scanned, 'lineup')
+  return targetInfo($self, 'self')
+}
+
+// Insert a freshly built item into the target page's story and wire it up. When the target is the
+// recorder's own page the item lands right after the recorder; otherwise it appends to the end.
+function placeItem(target, $item, newItem) {
+  const isOwn = target.$page[0] === ownPage($item)[0]
+  const $story = target.$page.find('.story:first')
+  const $anchor = isOwn ? $item : $story.children('.item').last()
+  const $new = $('<div />', { class: `item ${newItem.type}`, 'data-id': newItem.id })
+    .data('item', newItem)
+    .data('pageElement', target.$page)
+  if ($anchor.length) $anchor.after($new)
+  else $story.append($new)
+  wiki.doPlugin($new, newItem)
+  return { $new, afterId: $anchor.length ? $anchor.attr('data-id') : null }
+}
+
 let audioContext
 let meterSource // keep a reference — Chrome GCs unreferenced MediaStreamAudioSourceNodes, silencing the meter
 
@@ -189,9 +270,8 @@ function recordStream(stream, ui, { maxSeconds = 600, label, gainDb = 0 }) {
 
 // ---------- save to assets + emit native audio item ----------
 
-async function saveRecording($item, item, take) {
-  const $page = $item.parents('.page:first')
-  const slug = $page.attr('id')
+async function saveRecording(item, take, target) {
+  const slug = target.slug
   const filename = timestampName('voice-note', extFor(take.mime))
   const sidecarName = filename.replace(/\.\w+$/, '.json')
   const src = `assets/${slug}/${filename}`
@@ -249,25 +329,15 @@ function putAndWait($page, action) {
   })
 }
 
-function emitAudioItem($item, item, src, caption) {
-  const audioItem = {
-    type: 'audio',
-    id: randomId(),
-    // absolute URL: assets do not travel when a page is forked, so point at this site explicitly
-    text: `${location.origin}/${src}\n${caption}`,
-  }
-  const $page = $item.parents('.page:first')
-  const $new = $('<div />', { class: 'item audio', 'data-id': audioItem.id }).data('item', audioItem).data('pageElement', $page)
-  $item.after($new)
-  wiki.doPlugin($new, audioItem)
-  return audioItem
-}
-
 async function saveAndEmit($item, item, take, ui) {
-  ui.status.textContent = 'saving…'
+  const target = resolveTarget($item, item)
+  ui.status.textContent = `saving into ${target.title}…`
   const caption = (item.text || '').trim() || `Voice note — ${new Date().toLocaleString()}`
-  const saved = await saveRecording($item, item, take)
-  const audioItem = emitAudioItem($item, item, saved.src, caption)
+  const saved = await saveRecording(item, take, target)
+
+  // absolute URL: assets do not travel when a page is forked, so point at this site explicitly
+  const audioItem = { type: 'audio', id: randomId(), text: `${location.origin}/${saved.src}\n${caption}` }
+  const { afterId } = placeItem(target, $item, audioItem)
 
   item.recording = {
     src: saved.src,
@@ -277,15 +347,18 @@ async function saveAndEmit($item, item, take, ui) {
     peakDb: take.peakDb,
     created: saved.sidecar.created,
     audioItemId: audioItem.id,
+    targetSlug: target.slug,
+    targetTitle: target.title,
   }
-  const $page = $item.parents('.page:first')
-  await putAndWait($page, { item: audioItem, id: audioItem.id, type: 'add', after: item.id })
-  await putAndWait($page, { item, id: item.id, type: 'edit' })
+  // the audio item goes onto the target page; the recorder item's metadata edit stays on its own page
+  await putAndWait(target.$page, { item: audioItem, id: audioItem.id, type: 'add', after: afterId })
+  await putAndWait(ownPage($item), { item, id: item.id, type: 'edit' })
   ui.transcribe.disabled = false
 
   const quiet = take.peakDb < -30 ? ` — warning: quiet take (peak ${take.peakDb} dBFS)` : ''
-  ui.status.textContent = `saved ${saved.filename} (${(take.blob.size / 1024).toFixed(0)} KB, ${take.duration}s)${quiet}`
-  return { saved, audioItem }
+  const into = target.$page[0] === ownPage($item)[0] ? '' : ` into ${target.title}`
+  ui.status.textContent = `saved ${saved.filename}${into} (${(take.blob.size / 1024).toFixed(0)} KB, ${take.duration}s)${quiet}`
+  return { saved, audioItem, target }
 }
 
 // ---------- transcription (local Whisper provider) ----------
@@ -304,9 +377,17 @@ async function transcribeRecording($item, item, ui) {
   const transcript = await res.json()
   if (transcript.error) throw new Error(transcript.error)
 
+  // resolve the same target the recording was saved into (lineup may have changed since)
+  const $self = ownPage($item)
+  const target = {
+    $page: pageForSlug(rec.targetSlug, $self),
+    slug: rec.targetSlug || $self.attr('id'),
+    title: rec.targetTitle || pageTitle($self),
+  }
+
   // save JSON sidecar and plain-text transcript next to the recording
-  const $page = $item.parents('.page:first')
-  const slug = $page.attr('id')
+  const $page = target.$page
+  const slug = target.slug
   const transcriptName = rec.filename.replace(/\.\w+$/, '.transcript.json')
   const transcriptTxtName = rec.filename.replace(/\.\w+$/, '.transcript.txt')
   const form = new FormData()
@@ -328,19 +409,18 @@ async function transcribeRecording($item, item, ui) {
     id: randomId(),
     text: `> ${transcript.text}\n\n*Transcript of ${rec.filename} — ${transcript.provider} (${transcript.model}), language ${transcript.language}.*`,
   }
-  const afterId = rec.audioItemId || item.id
-  let $anchor = $page.find(`.item[data-id="${afterId}"]`)
-  if (!$anchor.length) $anchor = $item
+  let $anchor = $page.find(`.story:first > .item[data-id="${rec.audioItemId}"]`)
+  if (!$anchor.length) $anchor = $page.find('.story:first > .item').last()
   const $new = $('<div />', { class: 'item markdown', 'data-id': mdItem.id }).data('item', mdItem).data('pageElement', $page)
-  $anchor.after($new)
+  if ($anchor.length) $anchor.after($new)
+  else $page.find('.story:first').append($new)
   wiki.doPlugin($new, mdItem)
-  await putAndWait($page, { item: mdItem, id: mdItem.id, type: 'add', after: $anchor.length && $anchor[0] !== $item[0] ? afterId : item.id })
+  await putAndWait($page, { item: mdItem, id: mdItem.id, type: 'add', after: $anchor.length ? $anchor.attr('data-id') : null })
 
-  // update the audio item's caption to [[Page Title]] - [txt-url filename]
+  // update the audio item's caption to [[Target Title]] - [txt-url filename]
   if (rec.audioItemId) {
-    const pageTitle = $page.data('data')?.title || slug
     const txtUrl = `${location.origin}/assets/${slug}/${transcriptTxtName}`
-    const newCaption = `[[${pageTitle}]] - [${txtUrl} ${transcriptTxtName}]`
+    const newCaption = `[[${target.title}]] - [${txtUrl} ${transcriptTxtName}]`
     const $audioEl = $page.find(`.item[data-id="${rec.audioItemId}"]`)
     if ($audioEl.length) {
       const audioItem = $audioEl.data('item')
@@ -356,7 +436,7 @@ async function transcribeRecording($item, item, ui) {
 
   item.recording.transcript = `assets/${slug}/${transcriptName}`
   item.recording.transcriptTxt = `assets/${slug}/${transcriptTxtName}`
-  await putAndWait($page, { item, id: item.id, type: 'edit' })
+  await putAndWait(ownPage($item), { item, id: item.id, type: 'edit' }) // recorder item lives on its own page
 
   ui.status.textContent = `transcribed — ${transcript.segments.length} segments, language ${transcript.language}`
   return transcript
@@ -387,6 +467,7 @@ const html = item => `
     <div class="an-status" style="font-size:.8em; color:#555; margin-top:4px;">${
       item.recording ? `last saved: ${item.recording.filename} (${item.recording.duration}s)` : 'no recording yet'
     }</div>
+    <div class="an-target" title="drop a page link here to pin a target" style="font-size:.8em; color:#444; margin-top:6px; padding:3px 6px; border:1px dashed #bbb; border-radius:4px;">resolving target…</div>
     <p class="an-caption" style="font-style:italic; margin:6px 0 0;">${wiki.resolveLinks(item.text || '(double-click to add a caption)')}</p>
   </div>
 `
@@ -409,6 +490,7 @@ const getUI = $item => {
     meter: el('.an-meter'),
     player: el('.an-player'),
     status: el('.an-status'),
+    target: el('.an-target'),
     stopFn: null,
   }
 }
@@ -434,6 +516,51 @@ const bind = ($item, item) => {
     localStorage.setItem(GAIN_KEY, ui.gain.value)
   }
   const currentGainDb = () => +ui.gain.value
+
+  // ---- target line (Option C/D): show the effective target, accept a dropped page to pin it ----
+  const refreshTarget = () => {
+    const t = resolveTarget($item, item)
+    const label = { pinned: 'pinned', caption: 'from caption', lineup: 'lineup', self: 'this page' }[t.source]
+    const link = wiki.resolveLinks(`[[${t.title}]]`)
+    const unpin = item.target ? ' · <a href="#" class="an-unpin">unpin</a>' : ''
+    const warn = t.unresolved ? ` <span style="color:#c0392b">("${t.unresolved}" not open — using this page)</span>` : ''
+    ui.target.innerHTML = `→ recording into ${link} <span style="color:#888">(${label})</span>${unpin}${warn}`
+    ui.target.querySelector('.an-unpin')?.addEventListener('click', async e => {
+      e.preventDefault()
+      delete item.target
+      $item.data('item', item)
+      await putAndWait(ownPage($item), { item, id: item.id, type: 'edit' })
+      refreshTarget()
+    })
+  }
+  refreshTarget()
+
+  const slugFromDrop = dt => {
+    const uri = dt.getData('text/uri-list') || ''
+    const txt = dt.getData('text/plain') || ''
+    const url = (uri + ' ' + txt).match(/\/view\/([A-Za-z0-9-]+)/)
+    if (url) return url[1]
+    const wl = txt.match(/\[\[([^\]]+)\]\]/)
+    if (wl) return slugify(wl[1])
+    try { const j = JSON.parse(txt); if (j?.title) return slugify(j.title) } catch {}
+    if (/^[\w][\w \-]*$/.test(txt.trim())) return slugify(txt.trim())
+    return null
+  }
+  // sibling lineup pages may finish rendering after this item binds, and the lineup can change
+  // later — refresh the indicator on hover so "where recordings go" is always current.
+  $item.on('mouseenter', refreshTarget)
+  ui.target.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'link' })
+  ui.target.addEventListener('drop', async e => {
+    e.preventDefault()
+    e.stopPropagation()
+    const slug = slugFromDrop(e.dataTransfer)
+    if (!slug) { ui.status.textContent = 'drop a page link onto the target line to pin it'; return }
+    item.target = slug
+    $item.data('item', item)
+    await putAndWait(ownPage($item), { item, id: item.id, type: 'edit' })
+    refreshTarget()
+    ui.status.textContent = `target pinned to ${slug}`
+  })
 
   const setBusy = busy => {
     ui.record.disabled = busy

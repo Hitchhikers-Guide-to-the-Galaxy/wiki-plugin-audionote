@@ -1,6 +1,6 @@
 {
   "name": "wiki-plugin-audio-note",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Federated Wiki - Audio Note Plugin: record a voice note in the browser, save it into wiki assets, emit a native audio item",
   "keywords": [
     "audio",
