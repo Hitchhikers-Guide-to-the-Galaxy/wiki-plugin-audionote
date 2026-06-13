@@ -317,7 +317,7 @@ async function saveRecording(item, take, target) {
   const src = `assets/${slug}/${filename}`
 
   const sidecar = {
-    type: 'audio-note',
+    type: 'audionote',
     page: slug,
     itemId: item.id,
     filename,
@@ -719,7 +719,7 @@ const bind = ($item, item) => {
 }
 
 if (typeof window !== 'undefined') {
-  window.plugins['audio-note'] = { emit, bind }
+  window.plugins['audionote'] = { emit, bind }
 }
 
 export const audioNote = typeof window == 'undefined' ? { preferredAudioTypes, timestampName, extFor, levelZone } : undefined

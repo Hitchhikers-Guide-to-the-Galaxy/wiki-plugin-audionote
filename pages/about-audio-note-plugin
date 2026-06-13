@@ -7,7 +7,7 @@
       "text": "The Audio Note plugin records a voice note in the browser and saves it into a wiki page's assets folder, then adds a native audio item so the recording plays everywhere — even on sites without this plugin installed. It can transcribe the take with local Whisper, and it can save the note into another page open in the lineup."
     },
     {
-      "type": "audio-note",
+      "type": "audionote",
       "id": "a4d10e6b22c91f02",
       "text": "Try recording a note here."
     },
@@ -39,7 +39,7 @@
     {
       "type": "markdown",
       "id": "a4d10e6b22c91f08",
-      "text": "## Repositories\n\n- GitHub — https://github.com/Hitchhikers-Guide-to-the-Galaxy/wiki-plugin-audio-note\n- npm — https://www.npmjs.com/package/wiki-plugin-audio-note"
+      "text": "## Repositories\n\n- GitHub — https://github.com/Hitchhikers-Guide-to-the-Galaxy/wiki-plugin-audionote\n- npm — https://www.npmjs.com/package/wiki-plugin-audionote"
     }
   ],
   "journal": [
@@ -54,7 +54,7 @@
             "text": "The Audio Note plugin records a voice note in the browser and saves it into a wiki page's assets folder, then adds a native audio item so the recording plays everywhere — even on sites without this plugin installed. It can transcribe the take with local Whisper, and it can save the note into another page open in the lineup."
           },
           {
-            "type": "audio-note",
+            "type": "audionote",
             "id": "a4d10e6b22c91f02",
             "text": "Try recording a note here."
           },
@@ -86,7 +86,7 @@
           {
             "type": "markdown",
             "id": "a4d10e6b22c91f08",
-            "text": "## Repositories\n\n- GitHub — https://github.com/Hitchhikers-Guide-to-the-Galaxy/wiki-plugin-audio-note\n- npm — https://www.npmjs.com/package/wiki-plugin-audio-note"
+            "text": "## Repositories\n\n- GitHub — https://github.com/Hitchhikers-Guide-to-the-Galaxy/wiki-plugin-audionote\n- npm — https://www.npmjs.com/package/wiki-plugin-audionote"
           }
         ]
       },
@@ -94,5 +94,5 @@
       "certificate": "from marvin"
     }
   ],
-  "plugin": "audio-note"
+  "plugin": "audionote"
 }

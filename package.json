@@ -1,5 +1,5 @@
 {
-  "name": "wiki-plugin-audio-note",
+  "name": "wiki-plugin-audionote",
   "version": "0.2.0",
   "description": "Federated Wiki - Audio Note Plugin: record a voice note in the browser, save it into wiki assets, emit a native audio item",
   "keywords": [
@@ -16,6 +16,6 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Hitchhikers-Guide-to-the-Galaxy/wiki-plugin-audio-note.git"
+    "url": "git+https://github.com/Hitchhikers-Guide-to-the-Galaxy/wiki-plugin-audionote.git"
   }
 }

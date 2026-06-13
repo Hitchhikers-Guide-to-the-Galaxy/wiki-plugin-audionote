@@ -1,4 +1,4 @@
-# wiki-plugin-audio-note
+# wiki-plugin-audionote
 
 Federated Wiki plugin: record a voice note in the browser, save it into the wiki's assets folder, and emit a native `audio` item pointing at the saved file.
 
@@ -19,7 +19,7 @@ Phase 1 of the FedWiki Media Plan. Client-only — no server component: uploads 
 ## Item format
 
 ```json
-{ "type": "audio-note", "id": "…", "text": "Caption for the saved audio item" }
+{ "type": "audionote", "id": "…", "text": "Caption for the saved audio item" }
 ```
 
 After a save the item also carries a `recording` summary (src, filename, mime, duration, peakDb, created).
@@ -27,10 +27,10 @@ After a save the item also carries a `recording` summary (src, filename, mime, d
 ## Install
 
 ```
-ln -s /path/to/wiki-plugin-audio-note <wiki>/node_modules/wiki-plugin-audio-note
+ln -s /path/to/wiki-plugin-audionote <wiki>/node_modules/wiki-plugin-audionote
 ```
 
-and add `"wiki-plugin-audio-note": "*"` to the wiki package's `dependencies` (required for the factory menu and the `/plugins/audio-note/` static route), then restart the wiki.
+and add `"wiki-plugin-audionote": "*"` to the wiki package's `dependencies` (required for the factory menu and the `/plugins/audionote/` static route), then restart the wiki.
 
 ## License
 
