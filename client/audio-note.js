@@ -55,15 +55,33 @@ const slugify = name =>
     ? wiki.asSlug(name)
     : name.replace(/\s/g, '-').replace(/[^A-Za-z0-9-]/g, '').toLowerCase()
 
-// An explicit target named in the caption: a [[Page Link]] or a "TARGET: Page Name" line.
-function captionTarget(text) {
-  if (!text) return null
-  const link = text.match(/\[\[([^\]]+)\]\]/)
-  if (link) return slugify(link[1])
-  const dsl = text.match(/^\s*TARGET:\s*(.+)$/im)
-  if (dsl) return slugify(dsl[1].trim())
-  return null
+// The item text is the DSL space. A line is a COMMAND when its first word is ALL-CAPS and
+// followed by a colon (e.g. "TARGET: Some Page"), or when the whole line is a single [[wikilink]].
+// Everything else is the human caption. (Command vocabulary is expected to grow later.)
+function parseItemText(text) {
+  const commands = []
+  const caption = []
+  for (const line of (text || '').split('\n')) {
+    const t = line.trim()
+    const lone = t.match(/^\[\[([^\]]+)\]\]$/)
+    const cmd = t.match(/^([A-Z][A-Z0-9_]+):\s*(.*)$/)
+    if (lone) commands.push({ name: 'TARGET', arg: lone[1] })
+    else if (cmd) commands.push({ name: cmd[1], arg: cmd[2].trim() })
+    else caption.push(line)
+  }
+  return { commands, caption: caption.join('\n').trim() }
 }
+
+// The target page named in the item text via a TARGET: command or a lone [[wikilink]] line.
+function itemTarget(text) {
+  const cmd = parseItemText(text).commands.find(c => c.name === 'TARGET')
+  if (!cmd) return null
+  const arg = cmd.arg.replace(/^\[\[/, '').replace(/\]\]$/, '').trim()
+  return arg ? slugify(arg) : null
+}
+
+// The human caption: the item text with command lines stripped out.
+const itemCaption = text => parseItemText(text).caption
 
 // Pages render as .page elements carrying their slug as id; DOM order is lineup order.
 const pageTitle = $page => $page.data('data')?.title || $page.attr('id')
@@ -94,10 +112,11 @@ const targetInfo = ($page, source, extra = {}) => ({ $page, slug: $page.attr('id
 
 function resolveTarget($item, item) {
   const $self = ownPage($item)
-  const explicit = item.target || captionTarget(item.text)
+  const fromText = itemTarget(item.text) // the visible, editable choice wins over a sticky pin
+  const explicit = fromText || item.target
   if (explicit) {
     const $page = findOpenPage(explicit, $self)
-    if ($page) return targetInfo($page, item.target ? 'pinned' : 'caption')
+    if ($page) return targetInfo($page, fromText ? 'caption' : 'pinned')
     return targetInfo($self, 'self', { unresolved: explicit }) // named but not open
   }
   const $scanned = lineupScan($self)
@@ -332,7 +351,7 @@ function putAndWait($page, action) {
 async function saveAndEmit($item, item, take, ui) {
   const target = resolveTarget($item, item)
   ui.status.textContent = `saving into ${target.title}…`
-  const caption = (item.text || '').trim() || `Voice note — ${new Date().toLocaleString()}`
+  const caption = itemCaption(item.text) || `Voice note — ${new Date().toLocaleString()}`
   const saved = await saveRecording(item, take, target)
 
   // absolute URL: assets do not travel when a page is forked, so point at this site explicitly
@@ -447,6 +466,11 @@ async function transcribeRecording($item, item, ui) {
 const html = item => `
   <div style="background-color:#eee; padding:12px; border-radius:6px;">
     <select class="an-mic" style="width:100%; font-size:.85em; margin-bottom:6px;"></select>
+    <div class="an-dest" title="Where this recording will be saved. Drag a page link here, or add a TARGET: line to the caption, to change it."
+      style="font-size:.9em; margin:0 0 8px; padding:6px 9px; border:2px dashed #9ab; border-radius:5px; background:#eef4ff;">
+      <strong>Saves to ▸</strong> <span class="an-target">resolving…</span>
+      <span class="an-dest-hint" style="color:#7a8aa0;"> · drag a page here</span>
+    </div>
     <div>
       <button class="an-check">Mic Check</button>
       <button class="an-record">Record</button>
@@ -467,8 +491,7 @@ const html = item => `
     <div class="an-status" style="font-size:.8em; color:#555; margin-top:4px;">${
       item.recording ? `last saved: ${item.recording.filename} (${item.recording.duration}s)` : 'no recording yet'
     }</div>
-    <div class="an-target" title="drop a page link here to pin a target" style="font-size:.8em; color:#444; margin-top:6px; padding:3px 6px; border:1px dashed #bbb; border-radius:4px;">resolving target…</div>
-    <p class="an-caption" style="font-style:italic; margin:6px 0 0;">${wiki.resolveLinks(item.text || '(double-click to add a caption)')}</p>
+    <p class="an-caption" style="font-style:italic; margin:6px 0 0;">${wiki.resolveLinks(itemCaption(item.text) || '(double-click to add a caption)')}</p>
   </div>
 `
 
@@ -490,6 +513,7 @@ const getUI = $item => {
     meter: el('.an-meter'),
     player: el('.an-player'),
     status: el('.an-status'),
+    dest: el('.an-dest'),
     target: el('.an-target'),
     stopFn: null,
   }
@@ -517,14 +541,18 @@ const bind = ($item, item) => {
   }
   const currentGainDb = () => +ui.gain.value
 
-  // ---- target line (Option C/D): show the effective target, accept a dropped page to pin it ----
+  // ---- "Saves to" destination (Option C/D): show where the recording lands, accept a dropped page ----
+  const SOURCE_LABEL = { pinned: 'pinned', caption: 'from caption', lineup: 'nearby page', self: 'this page' }
   const refreshTarget = () => {
     const t = resolveTarget($item, item)
-    const label = { pinned: 'pinned', caption: 'from caption', lineup: 'lineup', self: 'this page' }[t.source]
     const link = wiki.resolveLinks(`[[${t.title}]]`)
-    const unpin = item.target ? ' · <a href="#" class="an-unpin">unpin</a>' : ''
-    const warn = t.unresolved ? ` <span style="color:#c0392b">("${t.unresolved}" not open — using this page)</span>` : ''
-    ui.target.innerHTML = `→ recording into ${link} <span style="color:#888">(${label})</span>${unpin}${warn}`
+    const unpin = item.target ? ' · <a href="#" class="an-unpin" style="color:#c0392b;">✕ unpin</a>' : ''
+    const warn = t.unresolved ? ` <span style="color:#c0392b">— "${t.unresolved}" isn't open, using this page</span>` : ''
+    ui.target.innerHTML = `${link} <span style="color:#7a8aa0;">(${SOURCE_LABEL[t.source]})</span>${unpin}${warn}`
+    // green border once a real destination is chosen (anything but the bare own-page default)
+    const chosen = t.source !== 'self'
+    ui.dest.style.borderColor = chosen ? '#1a7f37' : '#9ab'
+    ui.dest.style.background = chosen ? '#eef9f0' : '#eef4ff'
     ui.target.querySelector('.an-unpin')?.addEventListener('click', async e => {
       e.preventDefault()
       delete item.target
@@ -547,19 +575,20 @@ const bind = ($item, item) => {
     return null
   }
   // sibling lineup pages may finish rendering after this item binds, and the lineup can change
-  // later — refresh the indicator on hover so "where recordings go" is always current.
+  // later — refresh the indicator on hover so "Saves to" is always current.
   $item.on('mouseenter', refreshTarget)
-  ui.target.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'link' })
-  ui.target.addEventListener('drop', async e => {
+  ui.dest.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'link'; ui.dest.style.background = '#d8ecff' })
+  ui.dest.addEventListener('dragleave', () => refreshTarget())
+  ui.dest.addEventListener('drop', async e => {
     e.preventDefault()
     e.stopPropagation()
     const slug = slugFromDrop(e.dataTransfer)
-    if (!slug) { ui.status.textContent = 'drop a page link onto the target line to pin it'; return }
+    if (!slug) { refreshTarget(); ui.status.textContent = 'drop a page link onto "Saves to" to pin a destination'; return }
     item.target = slug
     $item.data('item', item)
     await putAndWait(ownPage($item), { item, id: item.id, type: 'edit' })
     refreshTarget()
-    ui.status.textContent = `target pinned to ${slug}`
+    ui.status.textContent = `destination pinned to ${slug}`
   })
 
   const setBusy = busy => {

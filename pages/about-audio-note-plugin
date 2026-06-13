@@ -4,7 +4,7 @@
     {
       "type": "markdown",
       "id": "a4d10e6b22c91f01",
-      "text": "The Audio Note plugin records a voice note in the browser and saves it into the wiki page's assets folder, then adds a native audio item to the page so the recording plays everywhere — even on sites without this plugin installed."
+      "text": "The Audio Note plugin records a voice note in the browser and saves it into a wiki page's assets folder, then adds a native audio item so the recording plays everywhere — even on sites without this plugin installed. It can transcribe the take with local Whisper, and it can save the note into another page open in the lineup."
     },
     {
       "type": "audio-note",
@@ -19,7 +19,22 @@
     {
       "type": "markdown",
       "id": "a4d10e6b22c91f04",
-      "text": "Pick a microphone, click *Mic Check* to confirm the level on the dBFS meter, then *Record* (up to 10 minutes), preview, and *Save to Assets*. The audio file and a JSON metadata sidecar (duration, peak level, device, timestamps) are uploaded through the bundled assets endpoint into `assets/<page-slug>/`, and a native audio item appears below with an absolute URL so it survives forking. A take that never peaks above −30 dBFS gets a quiet-take warning before you save. Double-click the caption area to edit the caption used for the audio item."
+      "text": "Pick a microphone, click *Mic Check* to confirm the level on the dBFS meter, then *Record* (up to 10 minutes), preview, and *Save to Assets*. The audio file and a JSON metadata sidecar (duration, peak level, device, timestamps) are uploaded through the bundled assets endpoint into `assets/<page-slug>/`, and a native audio item appears with an absolute URL so it survives forking. A take that never peaks above −30 dBFS gets a quiet-take warning before you save. If your input is quiet, raise the OS input level first, or use the **auto gain** checkbox / **boost** slider. *Transcribe* then sends the saved recording to a local Whisper endpoint and adds the transcript text, a `.transcript.json` sidecar and a plain-text `.transcript.txt` to the page."
+    },
+    {
+      "type": "markdown",
+      "id": "a4d10e6b22c91f05",
+      "text": "## Choosing where it saves"
+    },
+    {
+      "type": "markdown",
+      "id": "a4d10e6b22c91f06",
+      "text": "The **Saves to ▸** banner shows the destination page *before* you record, and turns green once a real destination is chosen. By default it scans the lineup and picks the nearest other open page — so you can keep a recorder on the left and the subject page on the right — and falls back to the page it sits on when nothing else is open. The recording, its sidecars and the audio item all land on that destination page."
+    },
+    {
+      "type": "markdown",
+      "id": "a4d10e6b22c91f07",
+      "text": "Two ways to override the destination:\n\n- **Drag** a page link onto the **Saves to** banner to pin a destination (then *✕ unpin* to clear it).\n- **Type a command** in the caption. A `TARGET: Page Name` line — or a line that is just a `[[Page Link]]` — sets the destination. Command lines (first word ALL-CAPS with a colon, or a lone wikilink) are kept out of the spoken caption; every other line becomes the caption shown on the saved audio item. The command vocabulary is expected to grow."
     }
   ],
   "journal": [
@@ -31,7 +46,7 @@
           {
             "type": "markdown",
             "id": "a4d10e6b22c91f01",
-            "text": "The Audio Note plugin records a voice note in the browser and saves it into the wiki page's assets folder, then adds a native audio item to the page so the recording plays everywhere — even on sites without this plugin installed."
+            "text": "The Audio Note plugin records a voice note in the browser and saves it into a wiki page's assets folder, then adds a native audio item so the recording plays everywhere — even on sites without this plugin installed. It can transcribe the take with local Whisper, and it can save the note into another page open in the lineup."
           },
           {
             "type": "audio-note",
@@ -46,7 +61,22 @@
           {
             "type": "markdown",
             "id": "a4d10e6b22c91f04",
-            "text": "Pick a microphone, click *Mic Check* to confirm the level on the dBFS meter, then *Record* (up to 10 minutes), preview, and *Save to Assets*. The audio file and a JSON metadata sidecar (duration, peak level, device, timestamps) are uploaded through the bundled assets endpoint into `assets/<page-slug>/`, and a native audio item appears below with an absolute URL so it survives forking. A take that never peaks above −30 dBFS gets a quiet-take warning before you save. Double-click the caption area to edit the caption used for the audio item."
+            "text": "Pick a microphone, click *Mic Check* to confirm the level on the dBFS meter, then *Record* (up to 10 minutes), preview, and *Save to Assets*. The audio file and a JSON metadata sidecar (duration, peak level, device, timestamps) are uploaded through the bundled assets endpoint into `assets/<page-slug>/`, and a native audio item appears with an absolute URL so it survives forking. A take that never peaks above −30 dBFS gets a quiet-take warning before you save. If your input is quiet, raise the OS input level first, or use the **auto gain** checkbox / **boost** slider. *Transcribe* then sends the saved recording to a local Whisper endpoint and adds the transcript text, a `.transcript.json` sidecar and a plain-text `.transcript.txt` to the page."
+          },
+          {
+            "type": "markdown",
+            "id": "a4d10e6b22c91f05",
+            "text": "## Choosing where it saves"
+          },
+          {
+            "type": "markdown",
+            "id": "a4d10e6b22c91f06",
+            "text": "The **Saves to ▸** banner shows the destination page *before* you record, and turns green once a real destination is chosen. By default it scans the lineup and picks the nearest other open page — so you can keep a recorder on the left and the subject page on the right — and falls back to the page it sits on when nothing else is open. The recording, its sidecars and the audio item all land on that destination page."
+          },
+          {
+            "type": "markdown",
+            "id": "a4d10e6b22c91f07",
+            "text": "Two ways to override the destination:\n\n- **Drag** a page link onto the **Saves to** banner to pin a destination (then *✕ unpin* to clear it).\n- **Type a command** in the caption. A `TARGET: Page Name` line — or a line that is just a `[[Page Link]]` — sets the destination. Command lines (first word ALL-CAPS with a colon, or a lone wikilink) are kept out of the spoken caption; every other line becomes the caption shown on the saved audio item. The command vocabulary is expected to grow."
           }
         ]
       },
