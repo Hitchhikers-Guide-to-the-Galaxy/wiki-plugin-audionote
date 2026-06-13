@@ -108,6 +108,27 @@ function lineupScan($self) {
   return null
 }
 
+// Decode a dropped page the way the FedWiki client does (wiki-client/lib/drop.js), so flag drags
+// work the same across browsers. isUrl: browsers expose dragged URLs differently (Firefox uses
+// text/x-moz-url) and getData('URL') is the portable accessor. isPage: the client's canonical
+// page-URL matcher — captures site and slug from .../<site>/<slug> (e.g. /view/welcome-visitors/view/<slug>).
+function urlFromDrop(dt) {
+  if (dt && dt.types && (dt.types.includes('text/uri-list') || dt.types.includes('text/x-moz-url'))) {
+    const url = dt.getData('URL')
+    if (url && url.length) return url
+  }
+  return null
+}
+
+function pageFromDrop(dt) {
+  const url = urlFromDrop(dt)
+  if (!url) return null
+  const found = url.match(/^https?:\/\/([a-zA-Z0-9:.-]+)(\/([a-zA-Z0-9:.-]+)\/([a-z0-9-]+(_rev\d+)?))+$/)
+  if (!found) return null
+  const [, origin, , site, slug] = found
+  return { site: ['view', 'local', 'origin'].includes(site) ? origin : site, slug }
+}
+
 const targetInfo = ($page, source, extra = {}) => ({ $page, slug: $page.attr('id'), title: pageTitle($page), source, ...extra })
 
 function resolveTarget($item, item) {
@@ -564,22 +585,21 @@ const bind = ($item, item) => {
   refreshTarget()
 
   const slugFromDrop = dt => {
-    const uri = dt.getData('text/uri-list') || ''
-    const txt = dt.getData('text/plain') || ''
-    // A FedWiki page flag is a link whose href is the page's lineup URL
-    // (/view/welcome-visitors/view/<slug>) — the dragged page is the LAST /view/ segment,
-    // not the welcome-visitors context prefix at the front.
-    const views = [...(uri + ' ' + txt).matchAll(/\/view\/([A-Za-z0-9-]+)/g)]
-    if (views.length) return views[views.length - 1][1]
+    // primary path: FedWiki's own page-drop decoder (handles flag drags cross-browser)
+    const page = pageFromDrop(dt)
+    if (page) return page.slug
+    // fallbacks for non-flag drags (a rendered [[link]] or plain text)
+    const txt = (dt && dt.getData && dt.getData('text/plain')) || ''
     const wl = txt.match(/\[\[([^\]]+)\]\]/)
     if (wl) return slugify(wl[1])
-    try { const j = JSON.parse(txt); if (j?.title) return slugify(j.title) } catch {}
     if (/^[\w][\w \-]*$/.test(txt.trim())) return slugify(txt.trim())
     return null
   }
   // sibling lineup pages may finish rendering after this item binds, and the lineup can change
   // later — refresh the indicator on hover so "Saves to" is always current.
   $item.on('mouseenter', refreshTarget)
+  // dragenter + dragover preventDefault is what lets a drop land (mirrors the factory plugin)
+  ui.dest.addEventListener('dragenter', e => e.preventDefault())
   ui.dest.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'link'; ui.dest.style.background = '#d8ecff' })
   ui.dest.addEventListener('dragleave', () => refreshTarget())
   ui.dest.addEventListener('drop', async e => {
