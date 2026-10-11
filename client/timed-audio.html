@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Timed Audio</title>
+<!--
+  timed-audio — mark a clip of a long recording by ear, against its timed transcript.
+  The sound sibling of timed-video.html, served by wiki-plugin-audionote:
+
+    /plugins/audionote/timed-audio.html?audio=URL&transcript=URL[&page=Title][&speaker=Name][&t=seconds]
+
+  transcript: MacWhisper lines (.mw.json), YouTube-shape .json3, or .vtt — whatever the
+  recording's page has in its assets. Click a line to seek; "In" and "Out" take the playhead,
+  or Shift-click a line for In and Alt-click for Out. The result is an audionote CLIP item
+  to copy, or a ghost page in the lineup to drag the item from.
+-->
+<style>
+  :root { --line:#d8d8d8; --soft:#f6f6f4; --accent:#e6a23c; --muted:#666; }
+  * { box-sizing:border-box } body { margin:0; font:14px/1.4 -apple-system, Helvetica, Arial, sans-serif; color:#222; }
+  .app { display:grid; grid-template-rows:auto 1fr; height:100vh; }
+  .top { padding:10px 12px; border-bottom:1px solid var(--line); background:var(--soft); }
+  h1 { font-size:15px; margin:0 0 6px; } audio { width:100%; }
+  .row { display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-top:6px; }
+  button { font:inherit; padding:3px 8px; border:1px solid #aaa; border-radius:4px; background:#fff; cursor:pointer; }
+  button.primary { background:#333; color:#fff; border-color:#333; }
+  .read { font-variant-numeric:tabular-nums; color:var(--muted); }
+  .read strong { color:#222; }
+  textarea { width:100%; height:6.2em; font:12px/1.35 ui-monospace, Menlo, monospace; margin-top:6px; }
+  input[type=search] { flex:1; min-width:8em; padding:3px 6px; font:inherit; border:1px solid var(--line); border-radius:4px; }
+  .status { font-size:12px; color:var(--muted); min-height:1.3em; }
+  .panel { overflow:auto; }
+  .cue { display:grid; grid-template-columns:3.6rem 5.5rem minmax(0,1fr); gap:.5rem; width:100%; padding:.35rem .6rem; border:0; border-bottom:1px solid #eee; border-radius:0; text-align:left; background:#fff; }
+  .cue.nospeaker { grid-template-columns:3.6rem minmax(0,1fr); }
+  .cue:hover { background:var(--soft); } .cue.active { background:#fff6e0; }
+  .cue.inclip { box-shadow:inset 4px 0 0 var(--accent); }
+  .time, .who { color:var(--muted); font-variant-numeric:tabular-nums; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  mark { background:#fff0a8; } .error { padding:10px; color:#9b1c1c; }
+</style>
+</head>
+<body>
+<main class="app">
+  <section class="top">
+    <h1 id="title">Timed Audio</h1>
+    <audio id="audio" controls preload="metadata"></audio>
+    <div class="row">
+      <button id="markIn" title="Set the in point to the playhead">In</button>
+      <button id="markOut" title="Set the out point to the playhead">Out</button>
+      <button id="preview">▶ Preview</button>
+      <button id="clear">Clear</button>
+      <span class="read">in <strong id="rin">–</strong> · out <strong id="rout">–</strong> · <strong id="rlen">–</strong></span>
+      <input id="search" type="search" placeholder="Search the transcript">
+    </div>
+    <textarea id="item" readonly placeholder="Mark in and out to make a CLIP item. Shift-click a line for in, Alt-click for out."></textarea>
+    <div class="row">
+      <button id="copy">Copy item</button>
+      <button id="ghost" class="primary">Open clip as ghost page</button>
+      <span class="status" id="status"></span>
+    </div>
+  </section>
+  <section class="panel" id="panel"></section>
+</main>
+<script type="module">
+import { fmt } from './clip.js'
+const $ = id => document.getElementById(id)
+const params = new URLSearchParams(location.search)
+const abs = v => { try { return new URL(v, location.href).href } catch { return v } }
+const audioUrl = abs(params.get('audio') || ''), transcriptUrl = abs(params.get('transcript') || '')
+const state = { cues: [], in: null, out: null, page: params.get('page') || '', speaker: params.get('speaker') || '', query: '', active: -1 }
+const audio = $('audio'); audio.src = audioUrl
+const plain = t => String(t || '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()
+const ts = v => v.replace(',', '.').split(':').reduce((s, p) => s * 60 + Number(p), 0)
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
+
+function parse(text, url) {
+  if (/\.vtt($|\?)/.test(url) || text.startsWith('WEBVTT')) {
+    return text.replace(/\r/g, '').split(/\n\n+/).map(block => {
+      const lines = block.split('\n').filter(Boolean), i = lines.findIndex(l => l.includes('-->'))
+      if (i < 0) return null
+      const [a, rest] = lines[i].split('-->'), body = lines.slice(i + 1).join(' '), v = body.match(/<v\s+([^>]+)>/)
+      return { start: ts(a.trim()), end: ts(rest.trim().split(/\s+/)[0]), text: plain(body), speaker: v ? v[1].trim() : '' }
+    }).filter(c => c && c.text)
+  }
+  const data = JSON.parse(text)
+  if (data.lines) return data.lines.filter(l => plain(l.text)).map(l => ({ start: l.start_ms / 1000, end: l.end_ms / 1000, text: plain(l.text), speaker: l.speaker || '' }))
+  if (data.events) return data.events.filter(e => e.segs && !e.aAppend).map(e => ({ start: (e.tStartMs || 0) / 1000, end: ((e.tStartMs || 0) + (e.dDurationMs || 0)) / 1000, text: plain(e.segs.map(s => s.utf8 || '').join('')), speaker: '' })).filter(c => c.text)
+  if (data.segments) return data.segments.map(s => ({ start: s.start, end: s.end, text: plain(s.text), speaker: s.speaker || '' }))
+  throw new Error('unknown transcript shape')
+}
+
+const say = (m, bad) => { $('status').textContent = m; $('status').style.color = bad ? '#9b1c1c' : '' }
+const ok = () => state.in !== null && state.out !== null && state.out > state.in
+function speakerOfClip() {
+  if (state.speaker) return state.speaker
+  const inside = state.cues.filter(c => c.start >= state.in - 0.5 && c.end <= state.out + 0.5 && c.speaker)
+  const n = {}; inside.forEach(c => (n[c.speaker] = (n[c.speaker] || 0) + (c.end - c.start)))
+  return Object.keys(n).sort((a, b) => n[b] - n[a])[0] || ''
+}
+function itemText() {
+  if (!ok()) return ''
+  const who = speakerOfClip()
+  return ['CLIP', `AUDIO: ${audioUrl.split('#')[0]}#t=${state.in.toFixed(1)},${state.out.toFixed(1)}`, `IN: ${fmt(state.in)}`, `OUT: ${fmt(state.out)}`,
+    who ? `SPEAKER: ${who}` : '', state.page ? `SOURCE: ${state.page}` : '', 'Marked by ear.'].filter(Boolean).join('\n')
+}
+function paint() {
+  $('rin').textContent = state.in === null ? '–' : fmt(state.in); $('rout').textContent = state.out === null ? '–' : fmt(state.out)
+  $('rlen').textContent = ok() ? fmt(state.out - state.in) : '–'; $('item').value = itemText()
+  document.querySelectorAll('.cue').forEach(el => el.classList.toggle('inclip', ok() && +el.dataset.start >= state.in - 0.01 && +el.dataset.start < state.out))
+}
+function render() {
+  const q = state.query.toLowerCase(), any = state.cues.some(c => c.speaker)
+  const list = state.cues.map((c, i) => ({ c, i })).filter(x => !q || x.c.text.toLowerCase().includes(q))
+  $('panel').innerHTML = list.map(({ c, i }) => `<button class="cue${any ? '' : ' nospeaker'}" data-i="${i}" data-start="${c.start}"><span class="time">${fmt(c.start)}</span>${any ? `<span class="who">${esc(c.speaker)}</span>` : ''}<span>${q ? esc(c.text).replace(new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'ig'), m => `<mark>${m}</mark>`) : esc(c.text)}</span></button>`).join('') || '<div class="error">No lines.</div>'
+  paint()
+}
+$('panel').addEventListener('click', e => {
+  const el = e.target.closest('.cue'); if (!el) return
+  const c = state.cues[+el.dataset.i]
+  if (e.shiftKey) { state.in = c.start; say(`in at ${fmt(c.start)}`) }
+  else if (e.altKey) { state.out = c.end; say(`out at ${fmt(c.end)}`) }
+  else { audio.currentTime = c.start; audio.play().catch(() => {}) }
+  paint()
+})
+$('markIn').onclick = () => { state.in = audio.currentTime; say(`in at ${fmt(state.in)}`); paint() }
+$('markOut').onclick = () => { state.out = audio.currentTime; say(`out at ${fmt(state.out)}`); paint() }
+$('clear').onclick = () => { state.in = state.out = null; say(''); paint() }
+let previewing = false
+$('preview').onclick = () => { if (!ok()) return say('mark in and out first', true); previewing = true; audio.currentTime = state.in; audio.play().catch(() => {}) }
+audio.addEventListener('timeupdate', () => {
+  if (previewing && audio.currentTime >= state.out) { audio.pause(); previewing = false }
+  const t = audio.currentTime, i = state.cues.findIndex(c => t >= c.start && t < c.end)
+  if (i !== state.active) { state.active = i; document.querySelectorAll('.cue.active').forEach(el => el.classList.remove('active')); const el = document.querySelector(`.cue[data-i="${i}"]`); if (el) { el.classList.add('active'); el.scrollIntoView({ block: 'nearest' }) } }
+})
+$('search').oninput = e => { state.query = e.target.value.trim(); render() }
+$('copy').onclick = async () => { if (!ok()) return say('mark in and out first', true); try { await navigator.clipboard.writeText(itemText()); say('copied: paste into a new audionote item') } catch { $('item').select(); say('select and copy the text', true) } }
+const rid = () => Array.from(crypto.getRandomValues(new Uint8Array(8)), b => b.toString(16).padStart(2, '0')).join('')
+$('ghost').onclick = () => {
+  if (!ok()) return say('mark in and out first', true)
+  const page = { title: `${state.page || 'Recording'} Clip ${fmt(state.in)}-${fmt(state.out)}`, story: [
+    { type: 'markdown', id: rid(), text: `A clip${state.page ? ` of [[${state.page}]]` : ''}, marked by ear from ${fmt(state.in)} to ${fmt(state.out)}. Drag the player to the page it belongs on.` },
+    { type: 'audionote', id: rid(), text: itemText() }] }
+  if (window.parent && window.parent !== window) { window.parent.postMessage({ action: 'showResult', page }, '*'); say('opened as a ghost page in the lineup') }
+  else say('open this tool in a frame item on a wiki page to make a ghost page', true)
+}
+window.addEventListener('message', e => { if (e.data?.action === 'frameContext' && e.data.page?.title && !params.get('page')) { state.page = e.data.page.title; $('title').textContent = `Timed Audio: ${state.page}`; paint() } })
+if (window.parent && window.parent !== window) window.parent.postMessage({ action: 'sendFrameContext' }, '*')
+if (state.page) $('title').textContent = `Timed Audio: ${state.page}`
+try {
+  if (!audioUrl || !transcriptUrl) throw new Error('give ?audio= and ?transcript=')
+  const res = await fetch(transcriptUrl); if (!res.ok) throw new Error(`transcript ${res.status}`)
+  state.cues = parse(await res.text(), transcriptUrl); render()
+  const t = Number(params.get('t')); if (t > 0) audio.addEventListener('loadedmetadata', () => { audio.currentTime = t }, { once: true })
+  say(`${state.cues.length} lines`)
+} catch (err) { $('panel').innerHTML = `<div class="error">${esc(err.message)}</div>` }
+window.timedAudio = { state, itemText }
+</script>
+</body>
+</html>

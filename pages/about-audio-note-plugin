@@ -4,7 +4,7 @@
     {
       "type": "markdown",
       "id": "a4d10e6b22c91f01",
-      "text": "The Audio Note plugin records a voice note in the browser and saves it into a wiki page's assets folder, then adds a native audio item so the recording plays everywhere — even on sites without this plugin installed. It can transcribe the take with local Whisper, and it can save the note into another page open in the lineup."
+      "text": "The Audio Note plugin records a voice note in the browser and saves it into a wiki page's assets folder, then adds a native audio item so the recording plays everywhere \u2014 even on sites without this plugin installed. It can transcribe the take with local Whisper, and it can save the note into another page open in the lineup."
     },
     {
       "type": "audionote",
@@ -14,32 +14,62 @@
     {
       "type": "markdown",
       "id": "a4d10e6b22c91f03",
-      "text": "## How it works"
+      "text": "# How it works"
     },
     {
       "type": "markdown",
       "id": "a4d10e6b22c91f04",
-      "text": "Pick a microphone, click *Mic Check* to confirm the level on the dBFS meter, then *Record* (up to 10 minutes), preview, and *Save to Assets*. The audio file and a JSON metadata sidecar (duration, peak level, device, timestamps) are uploaded through the bundled assets endpoint into `assets/<page-slug>/`, and a native audio item appears with an absolute URL so it survives forking. A take that never peaks above −30 dBFS gets a quiet-take warning before you save. If your input is quiet, raise the OS input level first, or use the **auto gain** checkbox / **boost** slider. *Transcribe* then sends the saved recording to a local Whisper endpoint and adds the transcript text, a `.transcript.json` sidecar and a plain-text `.transcript.txt` to the page."
+      "text": "Pick a microphone, click *Mic Check* to confirm the level on the dBFS meter, then *Record* (up to 10 minutes), preview, and *Save to Assets*. The audio file and a JSON metadata sidecar (duration, peak level, device, timestamps) are uploaded through the bundled assets endpoint into `assets/<page-slug>/`, and a native audio item appears with an absolute URL so it survives forking. A take that never peaks above \u221230 dBFS gets a quiet-take warning before you save. If your input is quiet, raise the OS input level first, or use the **auto gain** checkbox / **boost** slider. *Transcribe* then sends the saved recording to a local Whisper endpoint and adds the transcript text, a `.transcript.json` sidecar and a plain-text `.transcript.txt` to the page."
     },
     {
       "type": "markdown",
       "id": "a4d10e6b22c91f05",
-      "text": "## Choosing where it saves"
+      "text": "# Choosing where it saves"
     },
     {
       "type": "markdown",
       "id": "a4d10e6b22c91f06",
-      "text": "The **Saves to ▸** banner shows the destination page *before* you record, and turns green once a real destination is chosen. By default it scans the lineup and picks the nearest other open page — so you can keep a recorder on the left and the subject page on the right — and falls back to the page it sits on when nothing else is open. The recording, its sidecars and the audio item all land on that destination page."
+      "text": "The **Saves to \u25b8** banner shows the destination page *before* you record, and turns green once a real destination is chosen. By default it scans the lineup and picks the nearest other open page \u2014 so you can keep a recorder on the left and the subject page on the right \u2014 and falls back to the page it sits on when nothing else is open. The recording, its sidecars and the audio item all land on that destination page."
     },
     {
       "type": "markdown",
       "id": "a4d10e6b22c91f07",
-      "text": "Two ways to override the destination:\n\n- **Drag** a page link onto the **Saves to** banner to pin a destination (then *✕ unpin* to clear it).\n- **Type a command** in the caption. A `TARGET: Page Name` line — or a line that is just a `[[Page Link]]` — sets the destination. Command lines (first word ALL-CAPS with a colon, or a lone wikilink) are kept out of the spoken caption; every other line becomes the caption shown on the saved audio item. The command vocabulary is expected to grow."
+      "text": "Two ways to override the destination:\n\n- **Drag** a page link onto the **Saves to** banner to pin a destination (then *\u2715 unpin* to clear it).\n- **Type a command** in the caption. A `TARGET: Page Name` line \u2014 or a line that is just a `[[Page Link]]` \u2014 sets the destination. Command lines (first word ALL-CAPS with a colon, or a lone wikilink) are kept out of the spoken caption; every other line becomes the caption shown on the saved audio item. The command vocabulary is expected to grow."
+    },
+    {
+      "type": "markdown",
+      "id": "b9232a0e1b2c2a05",
+      "text": "# Transcript item\n> A recording transcribed elsewhere, ready to be summarised here."
+    },
+    {
+      "type": "markdown",
+      "id": "b938ce343c931717",
+      "text": "An item whose text begins `TRANSCRIPT` shows a transcript that already exists \u2014 a voice note paged by the drop service, say. It plays the recording named on its `AUDIO:` line, shows the transcript, and offers the Voice Tool's prompts. Summarise, read and edit the result, then open it as a ghost page or add it to this page beneath the transcript."
+    },
+    {
+      "type": "markdown",
+      "id": "233e0e775b70e5c9",
+      "text": "The transcript lives in the item's own text, after the command lines. So the wiki's search finds its words and a fork carries them. `PROMPT:`, `PROMPTS:`, `KINDS:` and `TITLE:` lines work as they do on the Voice Tool. Summarising and adding need the site owner's login."
+    },
+    {
+      "type": "audionote",
+      "id": "157b6733e82429ee",
+      "text": "TRANSCRIPT\nThis is a short example transcript. Choose a prompt and press Summarise to try it on a site you own."
+    },
+    {
+      "type": "markdown",
+      "id": "980916f12517e01c",
+      "text": "# The Plan Tool's Answer\n> A question handed to the Voice Tool."
+    },
+    {
+      "type": "markdown",
+      "id": "916e1eebc6ac5fc4",
+      "text": "When the [[Plan Tool]]'s Answer link opens the [[Voice Tool]], it leaves the question's title in the browser's sessionStorage under `audionote.waitingFor`, and the Voice Tool, painting its red links, chooses that title as the page it is waiting for and as the page title if it is one of the red links of the page spoken to, removing the key either way."
     },
     {
       "type": "markdown",
       "id": "a4d10e6b22c91f08",
-      "text": "## Repositories\n\n- GitHub — https://github.com/Hitchhikers-Guide-to-the-Galaxy/wiki-plugin-audionote\n- npm — https://www.npmjs.com/package/wiki-plugin-audionote"
+      "text": "# Repositories\n\n- GitHub \u2014 https://github.com/Hitchhikers-Guide-to-the-Galaxy/wiki-plugin-audionote\n- npm \u2014 https://www.npmjs.com/package/wiki-plugin-audionote"
     }
   ],
   "journal": [
@@ -51,7 +81,7 @@
           {
             "type": "markdown",
             "id": "a4d10e6b22c91f01",
-            "text": "The Audio Note plugin records a voice note in the browser and saves it into a wiki page's assets folder, then adds a native audio item so the recording plays everywhere — even on sites without this plugin installed. It can transcribe the take with local Whisper, and it can save the note into another page open in the lineup."
+            "text": "The Audio Note plugin records a voice note in the browser and saves it into a wiki page's assets folder, then adds a native audio item so the recording plays everywhere \u2014 even on sites without this plugin installed. It can transcribe the take with local Whisper, and it can save the note into another page open in the lineup."
           },
           {
             "type": "audionote",
@@ -66,7 +96,7 @@
           {
             "type": "markdown",
             "id": "a4d10e6b22c91f04",
-            "text": "Pick a microphone, click *Mic Check* to confirm the level on the dBFS meter, then *Record* (up to 10 minutes), preview, and *Save to Assets*. The audio file and a JSON metadata sidecar (duration, peak level, device, timestamps) are uploaded through the bundled assets endpoint into `assets/<page-slug>/`, and a native audio item appears with an absolute URL so it survives forking. A take that never peaks above −30 dBFS gets a quiet-take warning before you save. If your input is quiet, raise the OS input level first, or use the **auto gain** checkbox / **boost** slider. *Transcribe* then sends the saved recording to a local Whisper endpoint and adds the transcript text, a `.transcript.json` sidecar and a plain-text `.transcript.txt` to the page."
+            "text": "Pick a microphone, click *Mic Check* to confirm the level on the dBFS meter, then *Record* (up to 10 minutes), preview, and *Save to Assets*. The audio file and a JSON metadata sidecar (duration, peak level, device, timestamps) are uploaded through the bundled assets endpoint into `assets/<page-slug>/`, and a native audio item appears with an absolute URL so it survives forking. A take that never peaks above \u221230 dBFS gets a quiet-take warning before you save. If your input is quiet, raise the OS input level first, or use the **auto gain** checkbox / **boost** slider. *Transcribe* then sends the saved recording to a local Whisper endpoint and adds the transcript text, a `.transcript.json` sidecar and a plain-text `.transcript.txt` to the page."
           },
           {
             "type": "markdown",
@@ -76,22 +106,90 @@
           {
             "type": "markdown",
             "id": "a4d10e6b22c91f06",
-            "text": "The **Saves to ▸** banner shows the destination page *before* you record, and turns green once a real destination is chosen. By default it scans the lineup and picks the nearest other open page — so you can keep a recorder on the left and the subject page on the right — and falls back to the page it sits on when nothing else is open. The recording, its sidecars and the audio item all land on that destination page."
+            "text": "The **Saves to \u25b8** banner shows the destination page *before* you record, and turns green once a real destination is chosen. By default it scans the lineup and picks the nearest other open page \u2014 so you can keep a recorder on the left and the subject page on the right \u2014 and falls back to the page it sits on when nothing else is open. The recording, its sidecars and the audio item all land on that destination page."
           },
           {
             "type": "markdown",
             "id": "a4d10e6b22c91f07",
-            "text": "Two ways to override the destination:\n\n- **Drag** a page link onto the **Saves to** banner to pin a destination (then *✕ unpin* to clear it).\n- **Type a command** in the caption. A `TARGET: Page Name` line — or a line that is just a `[[Page Link]]` — sets the destination. Command lines (first word ALL-CAPS with a colon, or a lone wikilink) are kept out of the spoken caption; every other line becomes the caption shown on the saved audio item. The command vocabulary is expected to grow."
+            "text": "Two ways to override the destination:\n\n- **Drag** a page link onto the **Saves to** banner to pin a destination (then *\u2715 unpin* to clear it).\n- **Type a command** in the caption. A `TARGET: Page Name` line \u2014 or a line that is just a `[[Page Link]]` \u2014 sets the destination. Command lines (first word ALL-CAPS with a colon, or a lone wikilink) are kept out of the spoken caption; every other line becomes the caption shown on the saved audio item. The command vocabulary is expected to grow."
           },
           {
             "type": "markdown",
             "id": "a4d10e6b22c91f08",
-            "text": "## Repositories\n\n- GitHub — https://github.com/Hitchhikers-Guide-to-the-Galaxy/wiki-plugin-audionote\n- npm — https://www.npmjs.com/package/wiki-plugin-audionote"
+            "text": "## Repositories\n\n- GitHub \u2014 https://github.com/Hitchhikers-Guide-to-the-Galaxy/wiki-plugin-audionote\n- npm \u2014 https://www.npmjs.com/package/wiki-plugin-audionote"
           }
         ]
       },
       "date": 1781286000000,
       "certificate": "from marvin"
+    },
+    {
+      "type": "add",
+      "id": "b9232a0e1b2c2a05",
+      "item": {
+        "type": "markdown",
+        "id": "b9232a0e1b2c2a05",
+        "text": "# Transcript item\n> A recording transcribed elsewhere, ready to be summarised here."
+      },
+      "after": null,
+      "date": 1790617012307
+    },
+    {
+      "type": "add",
+      "id": "b938ce343c931717",
+      "item": {
+        "type": "markdown",
+        "id": "b938ce343c931717",
+        "text": "An item whose text begins `TRANSCRIPT` shows a transcript that already exists \u2014 a voice note paged by the drop service, say. It plays the recording named on its `AUDIO:` line, shows the transcript, and offers the Voice Tool's prompts. Summarise, read and edit the result, then open it as a ghost page or add it to this page beneath the transcript."
+      },
+      "after": null,
+      "date": 1790617012307
+    },
+    {
+      "type": "add",
+      "id": "233e0e775b70e5c9",
+      "item": {
+        "type": "markdown",
+        "id": "233e0e775b70e5c9",
+        "text": "The transcript lives in the item's own text, after the command lines. So the wiki's search finds its words and a fork carries them. `PROMPT:`, `PROMPTS:`, `KINDS:` and `TITLE:` lines work as they do on the Voice Tool. Summarising and adding need the site owner's login."
+      },
+      "after": null,
+      "date": 1790617012307
+    },
+    {
+      "type": "add",
+      "id": "157b6733e82429ee",
+      "item": {
+        "type": "audionote",
+        "id": "157b6733e82429ee",
+        "text": "TRANSCRIPT\nThis is a short example transcript. Choose a prompt and press Summarise to try it on a site you own."
+      },
+      "after": null,
+      "date": 1790617012307
+    },
+    {
+      "type": "add",
+      "id": "980916f12517e01c",
+      "item": {
+        "type": "markdown",
+        "id": "980916f12517e01c",
+        "text": "# The Plan Tool's Answer\n> A question handed to the Voice Tool."
+      },
+      "after": "157b6733e82429ee",
+      "date": 1791671776892,
+      "provenance": "Claude Code (Opus 5.5), Plan Tool Plan Phase 5, 2026-10-11"
+    },
+    {
+      "type": "add",
+      "id": "916e1eebc6ac5fc4",
+      "item": {
+        "type": "markdown",
+        "id": "916e1eebc6ac5fc4",
+        "text": "When the [[Plan Tool]]'s Answer link opens the [[Voice Tool]], it leaves the question's title in the browser's sessionStorage under `audionote.waitingFor`, and the Voice Tool, painting its red links, chooses that title as the page it is waiting for and as the page title if it is one of the red links of the page spoken to, removing the key either way."
+      },
+      "after": "980916f12517e01c",
+      "date": 1791671776892,
+      "provenance": "Claude Code (Opus 5.5), Plan Tool Plan Phase 5, 2026-10-11"
     }
   ],
   "plugin": "audionote"

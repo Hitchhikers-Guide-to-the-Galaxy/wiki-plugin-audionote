@@ -1,14 +1,17 @@
 {
   "name": "wiki-plugin-audionote",
-  "version": "0.2.0",
-  "description": "Federated Wiki - Audio Note Plugin: record a voice note in the browser, save it into wiki assets, emit a native audio item",
+  "version": "0.5.3",
+  "description": "Federated Wiki - Audio Note Plugin: speak to a wiki page — record or drop audio, store it in the page assets, transcribe it with faster-whisper and add a summarised transcript",
   "keywords": [
     "audio",
     "recorder",
     "voice note",
     "wiki",
     "federated wiki",
-    "plugin"
+    "plugin",
+    "transcription",
+    "whisper",
+    "voice"
   ],
   "author": {
     "name": "David Bovill"
@@ -17,5 +20,36 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Hitchhikers-Guide-to-the-Galaxy/wiki-plugin-audionote.git"
-  }
+  },
+  "files": [
+    "api",
+    "client",
+    "pages",
+    "factory.json",
+    "ReadMe.md"
+  ],
+  "scripts": {
+    "build": "node scripts/build.js",
+    "test": "npm run version-file --silent && node test/fill.cjs && node test/discover.cjs && node --test test/clip.test.mjs",
+    "version-file": "node -e \"require('fs').writeFileSync('client/version.json', JSON.stringify({version: require('./package.json').version}) + '\\n')\"",
+    "prepack": "npm run version-file"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.127.0",
+    "@fortyfoxes/wiki-claude-door": "^0.1.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  },
+  "fedwiki": {
+    "api": {
+      "version": 1,
+      "spec": "api/openapi.json",
+      "handlers": "api/handlers.js"
+    }
+  },
+  "bugs": {
+    "url": "https://github.com/Hitchhikers-Guide-to-the-Galaxy/wiki-plugin-audionote/issues"
+  },
+  "homepage": "https://github.com/Hitchhikers-Guide-to-the-Galaxy/wiki-plugin-audionote#readme"
 }

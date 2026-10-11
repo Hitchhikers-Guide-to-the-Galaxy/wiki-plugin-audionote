@@ -1,5 +1,8 @@
 {
   "name": "AudioNote",
-  "title": "Audio Note — record a voice note into the page",
-  "category": "format"
+  "title": "Audio Note — record a voice note, or speak to a page with the Voice Tool",
+  "category": "format",
+  "pages": [
+    "Voice Tool"
+  ]
 }

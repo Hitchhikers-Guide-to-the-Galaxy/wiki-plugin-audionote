@@ -1,0 +1,186 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Audio Note",
+    "version": "0.3.0",
+    "description": "Speak to a wiki page. A recording already stored in the site's assets (through the Farm plugin's assets upload) is transcribed on this farm with faster-whisper, and the transcript can be summarised by Claude through a prompt — usually one drawn from a prompt wiki. The recorder and the Voice Tool page use these; so can an agent."
+  },
+  "paths": {
+    "/transcribe.json": {
+      "post": {
+        "operationId": "transcribe",
+        "summary": "Transcribe a recording in this site's assets",
+        "description": "Queues faster-whisper over assets/<slug>/<filename> and answers at once with a job to poll. Writes <name>.whisper.json and <name>.txt beside the recording.",
+        "x-fedwiki-writes": true,
+        "x-fedwiki-context": [
+          "origin",
+          "status"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "slug",
+                  "filename"
+                ],
+                "properties": {
+                  "slug": {
+                    "type": "string",
+                    "description": "The page whose asset folder holds the recording."
+                  },
+                  "filename": {
+                    "type": "string",
+                    "description": "The recording's file name in that folder."
+                  },
+                  "model": {
+                    "type": "string",
+                    "description": "Whisper model: tiny.en, base.en or small.en (and the multilingual tiny, base, small). Default set by the farm."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The job id, and how many are ahead of it."
+          },
+          "404": {
+            "description": "No such recording."
+          }
+        }
+      }
+    },
+    "/job.json": {
+      "get": {
+        "operationId": "job",
+        "summary": "How a transcription is getting on",
+        "x-fedwiki-read-only": true,
+        "x-fedwiki-context": [
+          "origin"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "description": "The job id transcribe returned.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "state is queued, running, done or failed; when done, text, segments and the sidecar paths."
+          },
+          "404": {
+            "description": "No such job at this site."
+          }
+        }
+      }
+    },
+    "/summarise.json": {
+      "post": {
+        "operationId": "summarise",
+        "summary": "Summarise a transcript through a prompt (Claude or Ollama)",
+        "description": "Fills the prompt's {{transcript}}, {{page_title}}, {{page_text}} and {{date}} and asks Claude. Spends money, so it is gated like a write.",
+        "x-fedwiki-writes": true,
+        "x-fedwiki-context": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "transcript"
+                ],
+                "properties": {
+                  "transcript": {
+                    "type": "string"
+                  },
+                  "pageTitle": {
+                    "type": "string"
+                  },
+                  "pageText": {
+                    "type": "string",
+                    "description": "The page's text, for prompts that answer it."
+                  },
+                  "title": {
+                    "type": "string",
+                    "description": "The title the result will be saved under, often one of the page's red links; prompts read it as {{title}}."
+                  },
+                  "prompt": {
+                    "type": "string",
+                    "description": "The prompt body, after its header. Omitted, a plain summary prompt is used."
+                  },
+                  "model": {
+                    "type": "string",
+                    "description": "claude-<id> for the Claude API, claude-cli:claude-<id> for the Claude Code CLI under the account logged in on the farm machine (a Max subscription, no API key), or ollama:<name> for an Ollama model on this farm (AUDIONOTE_OLLAMA_URL). Default AUDIONOTE_SUMMARY_MODEL, else claude-opus-5; AUDIONOTE_FALLBACK_MODEL is tried when the first cannot be reached."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "markdown, and the model that wrote it."
+          },
+          "422": {
+            "description": "Claude declined."
+          },
+          "503": {
+            "description": "No API key on this farm."
+          }
+        }
+      }
+    },
+    "/hear.json": {
+      "post": {
+        "operationId": "hear",
+        "summary": "Transcribe a recording without keeping it",
+        "description": "The request body is the recording itself. It is transcribed from the farm's temporary folder and then deleted — nothing is added to the site's assets. Answers at once with a job to poll; the finished job carries the text and segments. To keep the audio, upload it separately through the Farm plugin's assets upload.",
+        "x-fedwiki-writes": true,
+        "x-fedwiki-context": [
+          "origin"
+        ],
+        "x-fedwiki-max-bytes": 524288000,
+        "parameters": [
+          {
+            "name": "model",
+            "in": "query",
+            "required": false,
+            "description": "Whisper model: tiny.en, base.en or small.en (and the multilingual tiny, base, small).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The job id, and how many are ahead of it."
+          },
+          "413": {
+            "description": "Larger than this farm accepts."
+          }
+        }
+      }
+    }
+  }
+}
