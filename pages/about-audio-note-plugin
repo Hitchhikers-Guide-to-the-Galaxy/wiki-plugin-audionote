@@ -79,7 +79,7 @@
     {
       "type": "markdown",
       "id": "d5ac481911427212",
-      "text": "The Voice Tool sends a recording through a **local door** when the browser's own machine runs a farm: it probes `http://localhost:4242` for a farm whose *hear* is declared `x-fedwiki-gate: place` and `x-fedwiki-cross-origin: true` (Farm plugin 0.9.1), and posts the audio there. `DOOR:` in the item names another door, or `farm` to never look. See [[Voice Tool]]."
+      "text": "The Voice Tool sends a recording through a **local door** when the browser's own machine runs a farm: it probes `http://localhost:4242` for a farm whose *hear* is declared `x-fedwiki-gate: place` and `x-fedwiki-cross-origin: true` (Farm plugin 0.9.1), and posts the audio there. `DOOR:` in the item names another door, or `farm` to never look. See [[Voice Tool]] and the [[Voice Tool Guide]]."
     },
     {
       "type": "markdown",
@@ -238,6 +238,16 @@
       },
       "after": "81e230902cf3f8a4",
       "date": 1791810216457
+    },
+    {
+      "type": "edit",
+      "id": "d5ac481911427212",
+      "item": {
+        "type": "markdown",
+        "id": "d5ac481911427212",
+        "text": "The Voice Tool sends a recording through a **local door** when the browser's own machine runs a farm: it probes `http://localhost:4242` for a farm whose *hear* is declared `x-fedwiki-gate: place` and `x-fedwiki-cross-origin: true` (Farm plugin 0.9.1), and posts the audio there. `DOOR:` in the item names another door, or `farm` to never look. See [[Voice Tool]] and the [[Voice Tool Guide]]."
+      },
+      "date": 1791811272446
     }
   ],
   "plugin": "audionote"

@@ -13,93 +13,63 @@
     },
     {
       "type": "markdown",
-      "id": "396d9f5d598cf19e",
-      "text": "Open a page, then choose **Voice Tool** from the \u2630 menu: the tool opens to the right and takes that page as its subject. **Speak** \u2014 pause and resume as you think \u2014 then **Stop**; the farm transcribes what you said. Choose a prompt, **Summarise**, and edit. The notes get a **page title** \u2014 *Open Questions Notes* for a page called Open Questions \u2014 which you can change, in the tool or on the ghost page itself."
+      "id": "ae4074e18fbc5530",
+      "text": "Open a page, then choose **Voice Tool** from the \u2630 menu: it opens to the right and takes that page as its subject. **Speak** \u2014 pause and resume as you think \u2014 then **Stop**, and the words are transcribed. Choose a prompt, **Summarise**, and edit the result. The notes get a **page title**, *Open Questions Notes* for a page called Open Questions, which you can change; **a page it is waiting for** lists the page's red links, and choosing one names the notes after it, so saving turns that link blue."
     },
     {
       "type": "markdown",
-      "id": "68d1209647a0da7b",
-      "text": "Beside the title, **a page it is waiting for** lists the red links on the page to the left \u2014 pages it links to that nobody has written yet. Choose one and the notes take that name; saving turns the red link blue, so no new link is needed."
+      "id": "fdbec7b91aded615",
+      "text": "**Open as ghost page** shows the notes under that title, each point its own item, to drag wherever it belongs. **Save page & link it** makes the ghost a real page and puts a `[[link]]` to it on the page to the left. **Start over** clears the recording, transcript and summary. The rest \u2014 prompts, the shape of the page a note makes, phones, the directives \u2014 is in the [[Voice Tool Guide]]."
     },
     {
       "type": "markdown",
-      "id": "2a1dabc1f2d1d8bd",
-      "text": "**Open as ghost page** shows the notes under that title, each point its own item, to drag wherever it belongs. **Save page & link it** makes the ghost a real page of that name, puts a `[[link]]` to it on the page to the left, before its See section, and copies the link to the clipboard \u2014 drag the link beside the question it answers. Change the title for each question and a series of linked notes pages builds up. A title that already exists here is refused rather than overwritten. **Start over** clears the recording, transcript and summary."
+      "id": "677c4fe53bb423cf",
+      "text": "# Where Things Go"
     },
     {
       "type": "markdown",
-      "id": "fd1919eff8e4fb58",
-      "text": "An unsaved recording, its transcript and its summary are kept in this browser until you save or start over. Follow a link, edit the page on the left, close the tool or reload \u2014 open the Voice Tool again and they are still there. Nothing is written to the wiki for this. A recording picked up without its transcript \u2014 the farm refused it, or the network dropped \u2014 shows a **\u21bb Transcribe** button, so the audio is sent again rather than spoken again."
+      "id": "168ef144ce94cd84",
+      "text": "> Nothing reaches the wiki until you save."
     },
     {
       "type": "markdown",
-      "id": "59810a2e2baeea2a",
-      "text": "The page a note makes starts with the answer: the summary, each point its own item, with no heading or date above it \u2014 the question is the title and the journal keeps the date. It ends with a **# See** section linking back to the page it answers and to the prompt that shaped the summary; when that prompt was read from the prompt wiki, saving the page forks that site in (a fork event first in the journal, which hands over no credit), so the prompt link leads there. The recording is **not kept** unless you tick *keep the audio*: it is sent to the farm to be transcribed and deleted there, and the transcript then follows the answer under its own heading. Tick the box, choose the assets folder, and the recording is uploaded \u2014 then an audio player captioned with the title and date, and the folder's assets (the recording and its transcript .txt), take the transcript's place."
+      "id": "36cfbd9003db33a6",
+      "text": "An unsaved recording, its transcript and its summary live in **this browser** only, and survive following links, closing the tool or reloading, until you save or start over. **Save page & link it** writes one page to **this site** under the title, and one `[[link]]` on the page to the left. The recording itself is **thrown away** after transcription unless you tick *keep the audio*: then it is uploaded to this site's `assets/<folder>` with its transcript `.txt`, and the page gets a player instead of a transcript."
     },
     {
       "type": "markdown",
-      "id": "166c22321dcc3ce4",
-      "text": "`TITLE: {{page}} Notes` in the item sets the pattern the title starts from. Prompts come from a prompt wiki (**PROMPTS:**, default prompt.geek.fish), read after this site. Fork a prompt page to this site and your copy is the one used \u2014 see [[Prompt Format]]. Transcription runs on the farm serving this page, or through the local door described below; summaries come from Claude, or from an Ollama model where the farm is set up for one."
+      "id": "841b9b3ac487fde8",
+      "text": "# Privacy"
     },
     {
       "type": "markdown",
-      "id": "3f1181bb87fd5292",
-      "text": "On a phone, **record or choose a file** opens the phone's own recorder \u2014 the browser only allows the microphone itself over https."
+      "id": "e476266ae0ab8bfe",
+      "text": "> Your voice goes to one machine to be heard, and the words to one model to be summarised."
     },
     {
       "type": "markdown",
-      "id": "40e16ff3d29ba719",
-      "text": "# The Local Door"
+      "id": "4b7138f7362a410e",
+      "text": "**Who hears the audio.** The farm serving this page \u2014 or, when your browser is on a machine that runs a farm of its own (your laptop with its private farm up), that machine, through the **local door**; the status line says which. On a Mac with MacWhisper open, MacWhisper does the hearing, without filing the recording in its History unless the farm is set to. Either way the audio is transcribed from a temporary folder and deleted, unless you kept it."
     },
     {
       "type": "markdown",
-      "id": "a5d9826e45b262df",
-      "text": "> The machine you are sitting at hears you first."
+      "id": "41a765d67a2fa92e",
+      "text": "**Who reads the words.** Summarising sends the transcript, the prompt and the text of the page spoken to, to the model the farm is set up for: Claude (Anthropic's API, or the Claude Code CLI under the farm's own account), or an Ollama model on your own network where the farm has one. The prompt is read from a prompt wiki (prompt.geek.fish unless the item says otherwise)."
     },
     {
       "type": "markdown",
-      "id": "684c4c7eafcb5ba4",
-      "text": "A recording is normally sent to the farm serving the page. When the browser is on a machine that runs a farm of its own \u2014 a laptop with the private farm up \u2014 the Voice Tool asks that machine first: it probes `http://localhost:4242/system/api.json` once per page load, and if a farm answers whose *hear* operation is gated on the place alone, the recording goes through that **local door** instead. Only the audio travels; the transcript comes back, and the page, the prompt, the summary and any kept audio stay with the farm the page lives on. The status line says where the words were heard \u2014 *transcribing on this Mac, with MacWhisper*, or *on the farm*."
+      "id": "1f7b0ad2f4cf2ef7",
+      "text": "**Who may ask.** A public farm refuses hearing and summarising until its operator allows them. A private farm \u2014 a laptop, a tailnet \u2014 hears for anyone who can reach it, because hearing changes no page; summarising and saving still need the site owner's login."
     },
     {
       "type": "markdown",
-      "id": "a98fea5ed4c38327",
-      "text": "On a Mac the local farm hears with **MacWhisper** whenever that app is open, using the model the app has selected (Parakeet v3, say), and with faster-whisper when it is closed; the choice is made per recording, so opening the app changes the next one. The farm's `AUDIONOTE_ENGINE` can pin either engine; `AUDIONOTE_MACWHISPER_MODEL` names a model in MacWhisper's `engine:id` form, and `AUDIONOTE_MACWHISPER_PERSIST=1` also files each recording in MacWhisper's History."
-    },
-    {
-      "type": "markdown",
-      "id": "5f6441159815ce82",
-      "text": "`DOOR: farm` in the item sends every recording to the page's own farm and never probes; `DOOR: http://host:port` names a door of your own. The door answers a page from elsewhere without a login there because *hear* changes no page and keeps nothing \u2014 the farm transcribes from its temporary folder and deletes the file. A public farm still refuses it, as it refuses every write it has not been told to allow."
-    },
-    {
-      "type": "markdown",
-      "id": "2681c65fff5bc20e",
-      "text": "# Public Sites"
-    },
-    {
-      "type": "markdown",
-      "id": "1b025103a54df0e9",
-      "text": "> A public farm has to say yes first."
-    },
-    {
-      "type": "markdown",
-      "id": "2ded458333e4a3cb",
-      "text": "On a farm whose sites are reachable from the open internet, the Voice Tool's three writes \u2014 hear, transcribe and summarise \u2014 are refused with **403 \"is not a private site, and this farm has not been asked to allow writes to public ones\"** until the person running the farm lists them. The Farm plugin asks two questions in order: is this farm willing to take API writes on public sites at all, and may this caller edit this site. The first is answered by the farm's environment, the second by the wiki's own login. A private farm behind a tailnet answers the first with `FARM_API_PRIVATE_SUFFIXES`; a public farm needs `FARM_API_PUBLIC_WRITES=audionote.hear,audionote.transcribe,audionote.summarise,farm.assetsUpload`. Every scope is needed: listing only `audionote.hear` lets the transcript through and fails at summarise, and *keep the audio* uploads through the Farm plugin's own `farm.assetsUpload`, which is refused until it is listed too. The blanket value `1` would open every page-changing operation on the farm, including table writes and index rebuilds, and should not be used."
-    },
-    {
-      "type": "markdown",
-      "id": "52c2834762177b95",
-      "text": "Write an **Open Questions** list as red question links, `- [ ] [[Who may open an event?]]`, each question its own item, with no page behind the link. The tool lists them under *a page it is waiting for*, so a spoken answer lands on the page named by the question and turns the link blue."
-    },
-    {
-      "type": "markdown",
-      "id": "719be210439fdc6a",
+      "id": "49ed1622b4495e6d",
       "text": "# See"
     },
     {
       "type": "markdown",
-      "id": "f705e11231df45e5",
-      "text": "- [[About Audio Note Plugin]]\n- [[Voice Input Plan]]\n- [[Prompt Format]]"
+      "id": "c71e307299ecc1ba",
+      "text": "- [[Voice Tool Guide]] \u2014 everything else about the tool\n- [[About Audio Note Plugin]]\n- [[Prompt Format]]"
     }
   ],
   "journal": [
@@ -288,6 +258,228 @@
       },
       "after": "a98fea5ed4c38327",
       "date": 1791810154561
+    },
+    {
+      "type": "add",
+      "id": "ae4074e18fbc5530",
+      "item": {
+        "type": "markdown",
+        "id": "ae4074e18fbc5530",
+        "text": "Open a page, then choose **Voice Tool** from the \u2630 menu: it opens to the right and takes that page as its subject. **Speak** \u2014 pause and resume as you think \u2014 then **Stop**, and the words are transcribed. Choose a prompt, **Summarise**, and edit the result. The notes get a **page title**, *Open Questions Notes* for a page called Open Questions, which you can change; **a page it is waiting for** lists the page's red links, and choosing one names the notes after it, so saving turns that link blue."
+      },
+      "after": "20142b3f94057ad2",
+      "date": 1791811272446
+    },
+    {
+      "type": "add",
+      "id": "fdbec7b91aded615",
+      "item": {
+        "type": "markdown",
+        "id": "fdbec7b91aded615",
+        "text": "**Open as ghost page** shows the notes under that title, each point its own item, to drag wherever it belongs. **Save page & link it** makes the ghost a real page and puts a `[[link]]` to it on the page to the left. **Start over** clears the recording, transcript and summary. The rest \u2014 prompts, the shape of the page a note makes, phones, the directives \u2014 is in the [[Voice Tool Guide]]."
+      },
+      "after": "ae4074e18fbc5530",
+      "date": 1791811272446
+    },
+    {
+      "type": "add",
+      "id": "677c4fe53bb423cf",
+      "item": {
+        "type": "markdown",
+        "id": "677c4fe53bb423cf",
+        "text": "# Where Things Go"
+      },
+      "after": "fdbec7b91aded615",
+      "date": 1791811272446
+    },
+    {
+      "type": "add",
+      "id": "168ef144ce94cd84",
+      "item": {
+        "type": "markdown",
+        "id": "168ef144ce94cd84",
+        "text": "> Nothing reaches the wiki until you save."
+      },
+      "after": "677c4fe53bb423cf",
+      "date": 1791811272446
+    },
+    {
+      "type": "add",
+      "id": "36cfbd9003db33a6",
+      "item": {
+        "type": "markdown",
+        "id": "36cfbd9003db33a6",
+        "text": "An unsaved recording, its transcript and its summary live in **this browser** only, and survive following links, closing the tool or reloading, until you save or start over. **Save page & link it** writes one page to **this site** under the title, and one `[[link]]` on the page to the left. The recording itself is **thrown away** after transcription unless you tick *keep the audio*: then it is uploaded to this site's `assets/<folder>` with its transcript `.txt`, and the page gets a player instead of a transcript."
+      },
+      "after": "168ef144ce94cd84",
+      "date": 1791811272446
+    },
+    {
+      "type": "add",
+      "id": "841b9b3ac487fde8",
+      "item": {
+        "type": "markdown",
+        "id": "841b9b3ac487fde8",
+        "text": "# Privacy"
+      },
+      "after": "36cfbd9003db33a6",
+      "date": 1791811272446
+    },
+    {
+      "type": "add",
+      "id": "e476266ae0ab8bfe",
+      "item": {
+        "type": "markdown",
+        "id": "e476266ae0ab8bfe",
+        "text": "> Your voice goes to one machine to be heard, and the words to one model to be summarised."
+      },
+      "after": "841b9b3ac487fde8",
+      "date": 1791811272446
+    },
+    {
+      "type": "add",
+      "id": "4b7138f7362a410e",
+      "item": {
+        "type": "markdown",
+        "id": "4b7138f7362a410e",
+        "text": "**Who hears the audio.** The farm serving this page \u2014 or, when your browser is on a machine that runs a farm of its own (your laptop with its private farm up), that machine, through the **local door**; the status line says which. On a Mac with MacWhisper open, MacWhisper does the hearing, without filing the recording in its History unless the farm is set to. Either way the audio is transcribed from a temporary folder and deleted, unless you kept it."
+      },
+      "after": "e476266ae0ab8bfe",
+      "date": 1791811272446
+    },
+    {
+      "type": "add",
+      "id": "41a765d67a2fa92e",
+      "item": {
+        "type": "markdown",
+        "id": "41a765d67a2fa92e",
+        "text": "**Who reads the words.** Summarising sends the transcript, the prompt and the text of the page spoken to, to the model the farm is set up for: Claude (Anthropic's API, or the Claude Code CLI under the farm's own account), or an Ollama model on your own network where the farm has one. The prompt is read from a prompt wiki (prompt.geek.fish unless the item says otherwise)."
+      },
+      "after": "4b7138f7362a410e",
+      "date": 1791811272446
+    },
+    {
+      "type": "add",
+      "id": "1f7b0ad2f4cf2ef7",
+      "item": {
+        "type": "markdown",
+        "id": "1f7b0ad2f4cf2ef7",
+        "text": "**Who may ask.** A public farm refuses hearing and summarising until its operator allows them. A private farm \u2014 a laptop, a tailnet \u2014 hears for anyone who can reach it, because hearing changes no page; summarising and saving still need the site owner's login."
+      },
+      "after": "41a765d67a2fa92e",
+      "date": 1791811272446
+    },
+    {
+      "type": "add",
+      "id": "49ed1622b4495e6d",
+      "item": {
+        "type": "markdown",
+        "id": "49ed1622b4495e6d",
+        "text": "# See"
+      },
+      "after": "1f7b0ad2f4cf2ef7",
+      "date": 1791811272446
+    },
+    {
+      "type": "add",
+      "id": "c71e307299ecc1ba",
+      "item": {
+        "type": "markdown",
+        "id": "c71e307299ecc1ba",
+        "text": "- [[Voice Tool Guide]] \u2014 everything else about the tool\n- [[About Audio Note Plugin]]\n- [[Prompt Format]]"
+      },
+      "after": "49ed1622b4495e6d",
+      "date": 1791811272446
+    },
+    {
+      "type": "remove",
+      "id": "396d9f5d598cf19e",
+      "date": 1791811272446
+    },
+    {
+      "type": "remove",
+      "id": "68d1209647a0da7b",
+      "date": 1791811272446
+    },
+    {
+      "type": "remove",
+      "id": "2a1dabc1f2d1d8bd",
+      "date": 1791811272446
+    },
+    {
+      "type": "remove",
+      "id": "fd1919eff8e4fb58",
+      "date": 1791811272446
+    },
+    {
+      "type": "remove",
+      "id": "59810a2e2baeea2a",
+      "date": 1791811272446
+    },
+    {
+      "type": "remove",
+      "id": "166c22321dcc3ce4",
+      "date": 1791811272446
+    },
+    {
+      "type": "remove",
+      "id": "3f1181bb87fd5292",
+      "date": 1791811272446
+    },
+    {
+      "type": "remove",
+      "id": "40e16ff3d29ba719",
+      "date": 1791811272446
+    },
+    {
+      "type": "remove",
+      "id": "a5d9826e45b262df",
+      "date": 1791811272446
+    },
+    {
+      "type": "remove",
+      "id": "684c4c7eafcb5ba4",
+      "date": 1791811272446
+    },
+    {
+      "type": "remove",
+      "id": "a98fea5ed4c38327",
+      "date": 1791811272446
+    },
+    {
+      "type": "remove",
+      "id": "5f6441159815ce82",
+      "date": 1791811272446
+    },
+    {
+      "type": "remove",
+      "id": "2681c65fff5bc20e",
+      "date": 1791811272446
+    },
+    {
+      "type": "remove",
+      "id": "1b025103a54df0e9",
+      "date": 1791811272446
+    },
+    {
+      "type": "remove",
+      "id": "2ded458333e4a3cb",
+      "date": 1791811272446
+    },
+    {
+      "type": "remove",
+      "id": "52c2834762177b95",
+      "date": 1791811272446
+    },
+    {
+      "type": "remove",
+      "id": "719be210439fdc6a",
+      "date": 1791811272446
+    },
+    {
+      "type": "remove",
+      "id": "f705e11231df45e5",
+      "date": 1791811272446
     }
   ],
   "plugin": "audionote"
