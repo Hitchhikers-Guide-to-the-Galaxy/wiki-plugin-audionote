@@ -6,9 +6,11 @@
 // and documents them for people and agents alike. Each handler is a plain
 // function: values in, value out.
 //
-//   transcribe  — run faster-whisper over a recording already in the site's
-//                 assets; writes <name>.whisper.json and <name>.txt beside it.
-//                 Long on a Pi, so it answers with a job to poll.
+//   transcribe  — run whisper over a recording already in the site's assets;
+//                 writes <name>.whisper.json and <name>.txt beside it. Long on
+//                 a Pi, so it answers with a job to poll. The engine is
+//                 MacWhisper's CLI where that app is running (a Mac), else
+//                 faster-whisper — see engine() below.
 //   hear        — the same, for a recording sent as the request body and NOT
 //                 kept: transcribed from the farm's temporary folder, then
 //                 deleted. The Voice Tool's default.
@@ -31,7 +33,16 @@ const { spawn } = require('node:child_process')
 // import (Plan Tool Plan, Phase 4): askClaude, askClaudeCli, askOllama, door,
 // ask, fill, the model-id test, the key and token lookups and DNS-SD moved
 // there. CommonJS requiring an ES module: Node 22.12 or later.
-const claudeDoor = require('@fortyfoxes/wiki-claude-door')
+// That require() fails with "not yet fully loaded" while the farm is still
+// importing another plugin that imports the door itself (the Plan Tool), so
+// when it does, the door is imported on demand and the first summarise waits.
+let claudeDoor = null
+try {
+  claudeDoor = require('@fortyfoxes/wiki-claude-door')
+} catch (e) {
+  if (!/not yet fully loaded|ERR_REQUIRE_ASYNC_MODULE|ERR_REQUIRE_CYCLE_MODULE/.test(`${e.code} ${e.message}`)) throw e
+}
+const doorReady = async () => claudeDoor || (claudeDoor = await import('@fortyfoxes/wiki-claude-door'))
 
 const problem = (status, message) => Object.assign(new Error(message), { status })
 
@@ -85,7 +96,119 @@ const forget = () => {
   for (const [id, job] of jobs) if (job.finished && job.finished < cutoff) jobs.delete(id)
 }
 
+// ---------- which engine ----------
+//
+// Two engines write the same two files, so nothing downstream knows which ran:
+//
+//   faster-whisper  transcribe.py in the voice-engine venv — the Pis, the Mini,
+//                   any Linux farm, and a Mac where MacWhisper is closed.
+//   macwhisper      the MacWhisper app's own CLI (mw), which talks to the
+//                   RUNNING app over a socket and uses whatever model the app
+//                   has selected (Parakeet v3, say — faster and better than
+//                   base.en, and already on the laptop). Never on a Pi.
+//
+// AUDIONOTE_ENGINE names one outright; unset (or "auto") it is MacWhisper when
+// the app is up and faster-whisper otherwise, decided per job, so opening or
+// quitting the app changes the next recording and nothing else.
+
+const MACWHISPER_BIN = process.env.AUDIONOTE_MACWHISPER_BIN || '/Applications/MacWhisper.app/Contents/MacOS/mw'
+const MACWHISPER_SOCK = path.join(home, 'Library', 'Application Support', 'MacWhisper', 'cli.sock')
+
+/** Whether the MacWhisper app is running here, so its CLI will answer. */
+const macwhisperUp = () => {
+  if (process.platform !== 'darwin' || !fs.existsSync(MACWHISPER_BIN)) return false
+  try {
+    return fs.statSync(MACWHISPER_SOCK).isSocket()
+  } catch {
+    return false
+  }
+}
+
+const engine = () => {
+  const asked = String(process.env.AUDIONOTE_ENGINE || 'auto').toLowerCase()
+  if (asked === 'macwhisper') return 'macwhisper'
+  if (asked === 'faster-whisper' || asked === 'whisper') return 'faster-whisper'
+  return macwhisperUp() ? 'macwhisper' : 'faster-whisper'
+}
+
+/** The model MacWhisper has selected (the ▸ row of `mw models list`), remembered for a minute. */
+let modelCache = { at: 0, id: '' }
+const macwhisperModel = () =>
+  new Promise(resolve => {
+    if (process.env.AUDIONOTE_MACWHISPER_MODEL) return resolve(process.env.AUDIONOTE_MACWHISPER_MODEL)
+    if (Date.now() - modelCache.at < 60 * 1000) return resolve(modelCache.id)
+    const child = spawn(MACWHISPER_BIN, ['models', 'list'], { stdio: ['ignore', 'pipe', 'ignore'] })
+    let out = ''
+    child.stdout.on('data', d => (out += d))
+    const done = () => {
+      const row = out.split('\n').find(l => /^\s*▸/.test(l)) || ''
+      const id = (row.replace(/^\s*▸\s*/, '').split(/\s{2,}/)[0] || '').trim()
+      modelCache = { at: Date.now(), id }
+      resolve(id)
+    }
+    child.on('error', done)
+    child.on('close', done)
+    setTimeout(() => {
+      child.kill('SIGKILL')
+      done()
+    }, 10 * 1000).unref()
+  })
+
+/**
+ * MacWhisper's JSON — segments in milliseconds with words, and the text — as
+ * the record transcribe.py writes, so the two engines are one to everything
+ * that reads the files. Language is not reported by the CLI; duration is the
+ * end of the last segment.
+ */
+const fromMacWhisper = (json, { model = '', elapsed = 0 } = {}) => {
+  const segs = (json.segments || []).map(seg => ({
+    start: Math.round(Number(seg.start || 0)) / 1000,
+    end: Math.round(Number(seg.end || 0)) / 1000,
+    text: String(seg.text || '').trim(),
+  }))
+  const text = String(json.text || segs.map(s => s.text).join(' ')).trim()
+  const duration = segs.length ? segs[segs.length - 1].end : 0
+  return { provider: 'macwhisper', model, language: json.language || '', duration, elapsed, text, segments: segs }
+}
+
+const runMacWhisper = (audio, outbase) =>
+  new Promise((resolve, reject) => {
+    const started = Date.now()
+    const mwOut = `${outbase}.mw.json`
+    const args = ['transcribe', audio, '--format', 'json', '--no-speakers', '-o', mwOut, '--overwrite']
+    if (process.env.AUDIONOTE_MACWHISPER_MODEL) args.push('--model', process.env.AUDIONOTE_MACWHISPER_MODEL)
+    if (/^(1|yes|true|on)$/i.test(String(process.env.AUDIONOTE_MACWHISPER_PERSIST || ''))) args.push('--persist')
+    const child = spawn(MACWHISPER_BIN, args, { stdio: ['ignore', 'pipe', 'pipe'] })
+    let err = ''
+    child.stderr.on('data', d => (err += d))
+    const timer = setTimeout(() => child.kill('SIGKILL'), JOB_TIMEOUT_MS)
+    child.on('error', e => {
+      clearTimeout(timer)
+      reject(new Error(`could not start MacWhisper's CLI: ${e.message}`))
+    })
+    child.on('close', async code => {
+      clearTimeout(timer)
+      if (code !== 0) return reject(new Error(err.trim().split('\n').slice(-3).join(' ') || `MacWhisper exited with ${code}`))
+      try {
+        const json = JSON.parse(fs.readFileSync(mwOut, 'utf8'))
+        const record = fromMacWhisper(json, { model: await macwhisperModel(), elapsed: Math.round((Date.now() - started) / 10) / 100 })
+        fs.writeFileSync(`${outbase}.whisper.json`, JSON.stringify(record, null, 1))
+        fs.writeFileSync(`${outbase}.txt`, record.text + '\n')
+        resolve({ provider: record.provider, model: record.model, language: record.language, duration: record.duration, elapsed: record.elapsed })
+      } catch (e) {
+        reject(new Error(`MacWhisper finished but its transcript could not be read: ${e.message}`))
+      } finally {
+        fs.rmSync(mwOut, { force: true })
+      }
+    })
+  })
+
 const runWhisper = (audio, model, outbase) =>
+  engine() === 'macwhisper'
+    ? runMacWhisper(audio, outbase)
+    : runFasterWhisper(audio, model, outbase)
+
+const runFasterWhisper = (audio, model, outbase) =>
   new Promise((resolve, reject) => {
     const script = path.join(__dirname, 'transcribe.py')
     const child = spawn(python(), [script, audio, model, outbase], { stdio: ['ignore', 'pipe', 'pipe'] })
@@ -117,15 +240,16 @@ const runWhisper = (audio, model, outbase) =>
 const enqueue = ({ origin, audio, outbase, model, about = {}, kept = () => ({}), after = () => {} }) => {
   forget()
   const id = crypto.randomBytes(8).toString('hex')
-  const job = { id, origin, state: 'queued', model, queued: Date.now(), ...about }
+  const job = { id, origin, state: 'queued', model, engine: engine(), host: os.hostname(), queued: Date.now(), ...about }
   jobs.set(id, job)
   queue = queue.then(async () => {
     job.state = 'running'
     job.started = Date.now()
+    job.engine = engine() // decided now, not when queued: the app may have opened meanwhile
     try {
       const summary = await runWhisper(audio, model, outbase)
       const record = JSON.parse(fs.readFileSync(`${outbase}.whisper.json`, 'utf8'))
-      Object.assign(job, { state: 'done', ...summary, text: record.text, segments: record.segments, ...kept() })
+      Object.assign(job, { state: 'done', provider: record.provider || 'faster-whisper', ...summary, text: record.text, segments: record.segments, ...kept() })
     } catch (e) {
       Object.assign(job, { state: 'failed', error: e.message })
     }
@@ -134,7 +258,7 @@ const enqueue = ({ origin, audio, outbase, model, about = {}, kept = () => ({}),
     } catch {}
     job.finished = Date.now()
   })
-  return { job: id, state: job.state, model, ahead: [...jobs.values()].filter(j => j.state === 'queued' || j.state === 'running').length - 1 }
+  return { job: id, state: job.state, model, engine: job.engine, host: job.host, ahead: [...jobs.values()].filter(j => j.state === 'queued' || j.state === 'running').length - 1 }
 }
 
 const transcribe = ({ slug, filename, model, origin, status }) => {
@@ -192,9 +316,9 @@ const job = ({ id, origin }) => {
 // claude-opus-5. The fallback (CLAUDE_DOOR_FALLBACK_MODEL or
 // AUDIONOTE_FALLBACK_MODEL) is tried when the first choice cannot be reached
 // (no network, no key), so a summary still appears — marked with who wrote it.
-const DEFAULT_MODEL = claudeDoor.defaultModel('claude-opus-5')
-const FALLBACK_MODEL = claudeDoor.fallbackModel()
-const { fill, door, MODEL_ID } = claudeDoor
+const notYet = () => new Error('the Claude door is still loading — ask again in a moment')
+const fill = (...a) => (claudeDoor ? claudeDoor.fill(...a) : (() => { throw notYet() })())
+const door = (...a) => (claudeDoor ? claudeDoor.door(...a) : (() => { throw notYet() })())
 
 const SYSTEM =
   'You turn spoken notes into text for a federated wiki page. Write plain markdown that reads well on the page: ' +
@@ -205,13 +329,16 @@ const SYSTEM =
 // Voice Tool's own system prompt. The door's answer also carries ms, dropped
 // here so the summarise answer keeps its shape.
 const ask = async (model, content) => {
-  const { ms: _ms, ...out } = await claudeDoor.ask(model, content, { system: SYSTEM, timeoutMs: 7 * 60 * 1000, allowTools: false })
+  const { ms: _ms, ...out } = await (await doorReady()).ask(model, content, { system: SYSTEM, timeoutMs: 7 * 60 * 1000, allowTools: false })
   return out
 }
 
 const summarise = async ({ transcript, pageTitle, pageText, title, prompt, model }) => {
   const t = String(transcript || '').trim()
   if (!t) throw problem(400, 'there is no transcript to summarise')
+  const { MODEL_ID, defaultModel, fallbackModel } = await doorReady()
+  const DEFAULT_MODEL = defaultModel('claude-opus-5')
+  const FALLBACK_MODEL = fallbackModel()
   const chosen = typeof model === 'string' && MODEL_ID.test(model) ? model : DEFAULT_MODEL
   const template =
     String(prompt || '').trim() ||
@@ -232,4 +359,4 @@ const summarise = async ({ transcript, pageTitle, pageText, title, prompt, model
   }
 }
 
-module.exports = { transcribe, hear, job, summarise, fill, door }
+module.exports = { transcribe, hear, job, summarise, fill, door, engine, fromMacWhisper, macwhisperUp }

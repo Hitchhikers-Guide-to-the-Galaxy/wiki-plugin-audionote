@@ -68,6 +68,21 @@
     },
     {
       "type": "markdown",
+      "id": "5e8271984122b103",
+      "text": "# Engines and the Local Door"
+    },
+    {
+      "type": "markdown",
+      "id": "81e230902cf3f8a4",
+      "text": "The farm hears a recording with one of two engines that write the same files: **faster-whisper** (`api/transcribe.py` in the voice-engine venv) everywhere, and **MacWhisper**'s own CLI on a Mac where that app is open \u2014 chosen per job unless `AUDIONOTE_ENGINE` says otherwise. The finished job names its `provider`, `model`, `engine` and `host`."
+    },
+    {
+      "type": "markdown",
+      "id": "d5ac481911427212",
+      "text": "The Voice Tool sends a recording through a **local door** when the browser's own machine runs a farm: it probes `http://localhost:4242` for a farm whose *hear* is declared `x-fedwiki-gate: place` and `x-fedwiki-cross-origin: true` (Farm plugin 0.9.1), and posts the audio there. `DOOR:` in the item names another door, or `farm` to never look. See [[Voice Tool]]."
+    },
+    {
+      "type": "markdown",
       "id": "a4d10e6b22c91f08",
       "text": "# Repositories\n\n- GitHub \u2014 https://github.com/Hitchhikers-Guide-to-the-Galaxy/wiki-plugin-audionote\n- npm \u2014 https://www.npmjs.com/package/wiki-plugin-audionote"
     }
@@ -190,6 +205,39 @@
       "after": "980916f12517e01c",
       "date": 1791671776892,
       "provenance": "Claude Code (Opus 5.5), Plan Tool Plan Phase 5, 2026-10-11"
+    },
+    {
+      "type": "add",
+      "id": "5e8271984122b103",
+      "item": {
+        "type": "markdown",
+        "id": "5e8271984122b103",
+        "text": "# Engines and the Local Door"
+      },
+      "after": "916e1eebc6ac5fc4",
+      "date": 1791810216457
+    },
+    {
+      "type": "add",
+      "id": "81e230902cf3f8a4",
+      "item": {
+        "type": "markdown",
+        "id": "81e230902cf3f8a4",
+        "text": "The farm hears a recording with one of two engines that write the same files: **faster-whisper** (`api/transcribe.py` in the voice-engine venv) everywhere, and **MacWhisper**'s own CLI on a Mac where that app is open \u2014 chosen per job unless `AUDIONOTE_ENGINE` says otherwise. The finished job names its `provider`, `model`, `engine` and `host`."
+      },
+      "after": "5e8271984122b103",
+      "date": 1791810216457
+    },
+    {
+      "type": "add",
+      "id": "d5ac481911427212",
+      "item": {
+        "type": "markdown",
+        "id": "d5ac481911427212",
+        "text": "The Voice Tool sends a recording through a **local door** when the browser's own machine runs a farm: it probes `http://localhost:4242` for a farm whose *hear* is declared `x-fedwiki-gate: place` and `x-fedwiki-cross-origin: true` (Farm plugin 0.9.1), and posts the audio there. `DOOR:` in the item names another door, or `farm` to never look. See [[Voice Tool]]."
+      },
+      "after": "81e230902cf3f8a4",
+      "date": 1791810216457
     }
   ],
   "plugin": "audionote"

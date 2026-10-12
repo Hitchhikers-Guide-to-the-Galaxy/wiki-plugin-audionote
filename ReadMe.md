@@ -24,6 +24,14 @@ Phase 1 of the FedWiki Media Plan. Client-only — no server component: uploads 
 
 After a save the item also carries a `recording` summary (src, filename, mime, duration, peakDb, created).
 
+## Engines
+
+The farm hears a recording with **faster-whisper** (`api/transcribe.py`, in `~/voice-engine/venv`) — or, on a Mac where the [MacWhisper](https://goodsnooze.gumroad.com/l/macwhisper) app is open, with MacWhisper's own CLI and the model the app has selected. `AUDIONOTE_ENGINE=macwhisper|faster-whisper` pins one; unset, the choice is made per job. `AUDIONOTE_MACWHISPER_MODEL` (engine:id) and `AUDIONOTE_MACWHISPER_PERSIST=1` tune the MacWhisper run.
+
+## The local door
+
+The Voice Tool sends a recording to the farm serving the page — unless the browser is on a machine running a farm of its own. It probes `http://localhost:4242/system/api.json` once; a farm whose `hear` is declared `x-fedwiki-gate: place` and `x-fedwiki-cross-origin: true` (wiki-plugin-farm ≥ 0.9.1) hears the recording instead, without a login there, because hear changes no page and keeps nothing. `DOOR: url` in the item names a door, `DOOR: farm` never looks.
+
 ## Install
 
 ```

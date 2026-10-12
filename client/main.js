@@ -68,6 +68,7 @@ const slugify = name =>
 //   PROMPT: [[Title]] — the prompt chosen first
 //   PROMPTS: site     — the prompt wiki to read prompts from, after this site
 //   KINDS: a, b       — which kinds of prompt to offer (default summary, answer, minutes)
+//   DOOR: url | farm  — where recordings are heard: a local farm's address, or never look for one
 function parseItemText(text) {
   const commands = []
   const caption = []
@@ -1149,15 +1150,26 @@ function bindVoice($item, item) {
   // be transcribed again without being recorded again.
   const transcribeDraft = async draft => {
     say('transcribing…')
-    working('sending the recording to the farm')
+    working('looking for a local door')
     paint()
+    // A farm on this machine hears the recording when there is one (voice.js localDoor);
+    // otherwise the farm serving the page does, as before.
+    const door = await voice.localDoor(item.text)
+    const where = job =>
+      door ? (job?.engine === 'macwhisper' ? 'this Mac, with MacWhisper' : `this machine${job?.host ? ` (${job.host})` : ''}`) : 'the farm'
+    working(`sending the recording to ${door ? 'this machine' : 'the farm'}`)
     let transcript
     try {
-      transcript = await voice.hearBlob(draft.blob, draft.type, job => {
-        const what = job.state === 'queued' ? `transcription queued${job.ahead ? ` behind ${job.ahead}` : ''}` : 'transcribing on the farm'
-        if (S.draft === draft && S.work?.what !== what) working(what)
-        say(`${what}…`)
-      })
+      transcript = await voice.hearBlob(
+        draft.blob,
+        draft.type,
+        job => {
+          const what = job.state === 'queued' ? `transcription queued${job.ahead ? ` behind ${job.ahead}` : ''}` : `transcribing on ${where(job)}`
+          if (S.draft === draft && S.work?.what !== what) working(what)
+          say(`${what}…`)
+        },
+        door,
+      )
     } finally {
       if (S.draft === draft || !S.draft) working(null)
     }
@@ -1165,7 +1177,7 @@ function bindVoice($item, item) {
     draft.transcript = transcript
     persist()
     ui.tbox.open = true
-    say(`transcribed ${Math.round(transcript.duration || 0)}s in ${transcript.elapsed ?? '?'}s — choose a prompt and summarise`)
+    say(`transcribed ${Math.round(transcript.duration || 0)}s in ${transcript.elapsed ?? '?'}s on ${where(transcript)} — choose a prompt and summarise`)
     paint()
   }
   ui.retry.onclick = guard(async () => {

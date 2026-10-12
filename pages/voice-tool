@@ -39,12 +39,37 @@
     {
       "type": "markdown",
       "id": "166c22321dcc3ce4",
-      "text": "`TITLE: {{page}} Notes` in the item sets the pattern the title starts from. Prompts come from a prompt wiki (**PROMPTS:**, default prompt.geek.fish), read after this site. Fork a prompt page to this site and your copy is the one used \u2014 see [[Prompt Format]]. Transcription runs on the farm serving this page (faster-whisper); summaries come from Claude, or from an Ollama model where the farm is set up for one."
+      "text": "`TITLE: {{page}} Notes` in the item sets the pattern the title starts from. Prompts come from a prompt wiki (**PROMPTS:**, default prompt.geek.fish), read after this site. Fork a prompt page to this site and your copy is the one used \u2014 see [[Prompt Format]]. Transcription runs on the farm serving this page, or through the local door described below; summaries come from Claude, or from an Ollama model where the farm is set up for one."
     },
     {
       "type": "markdown",
       "id": "3f1181bb87fd5292",
       "text": "On a phone, **record or choose a file** opens the phone's own recorder \u2014 the browser only allows the microphone itself over https."
+    },
+    {
+      "type": "markdown",
+      "id": "40e16ff3d29ba719",
+      "text": "# The Local Door"
+    },
+    {
+      "type": "markdown",
+      "id": "a5d9826e45b262df",
+      "text": "> The machine you are sitting at hears you first."
+    },
+    {
+      "type": "markdown",
+      "id": "684c4c7eafcb5ba4",
+      "text": "A recording is normally sent to the farm serving the page. When the browser is on a machine that runs a farm of its own \u2014 a laptop with the private farm up \u2014 the Voice Tool asks that machine first: it probes `http://localhost:4242/system/api.json` once per page load, and if a farm answers whose *hear* operation is gated on the place alone, the recording goes through that **local door** instead. Only the audio travels; the transcript comes back, and the page, the prompt, the summary and any kept audio stay with the farm the page lives on. The status line says where the words were heard \u2014 *transcribing on this Mac, with MacWhisper*, or *on the farm*."
+    },
+    {
+      "type": "markdown",
+      "id": "a98fea5ed4c38327",
+      "text": "On a Mac the local farm hears with **MacWhisper** whenever that app is open, using the model the app has selected (Parakeet v3, say), and with faster-whisper when it is closed; the choice is made per recording, so opening the app changes the next one. The farm's `AUDIONOTE_ENGINE` can pin either engine; `AUDIONOTE_MACWHISPER_MODEL` names a model in MacWhisper's `engine:id` form, and `AUDIONOTE_MACWHISPER_PERSIST=1` also files each recording in MacWhisper's History."
+    },
+    {
+      "type": "markdown",
+      "id": "5f6441159815ce82",
+      "text": "`DOOR: farm` in the item sends every recording to the page's own farm and never probes; `DOOR: http://host:port` names a door of your own. The door answers a page from elsewhere without a login there because *hear* changes no page and keeps nothing \u2014 the farm transcribes from its temporary folder and deletes the file. A public farm still refuses it, as it refuses every write it has not been told to allow."
     },
     {
       "type": "markdown",
@@ -208,6 +233,61 @@
         "text": "On a farm whose sites are reachable from the open internet, the Voice Tool's three writes \u2014 hear, transcribe and summarise \u2014 are refused with **403 \"is not a private site, and this farm has not been asked to allow writes to public ones\"** until the person running the farm lists them. The Farm plugin asks two questions in order: is this farm willing to take API writes on public sites at all, and may this caller edit this site. The first is answered by the farm's environment, the second by the wiki's own login. A private farm behind a tailnet answers the first with `FARM_API_PRIVATE_SUFFIXES`; a public farm needs `FARM_API_PUBLIC_WRITES=audionote.hear,audionote.transcribe,audionote.summarise,farm.assetsUpload`. Every scope is needed: listing only `audionote.hear` lets the transcript through and fails at summarise, and *keep the audio* uploads through the Farm plugin's own `farm.assetsUpload`, which is refused until it is listed too. The blanket value `1` would open every page-changing operation on the farm, including table writes and index rebuilds, and should not be used."
       },
       "date": 1791660334142
+    },
+    {
+      "type": "add",
+      "id": "40e16ff3d29ba719",
+      "item": {
+        "type": "markdown",
+        "id": "40e16ff3d29ba719",
+        "text": "# The Local Door"
+      },
+      "after": "3f1181bb87fd5292",
+      "date": 1791810154561
+    },
+    {
+      "type": "add",
+      "id": "a5d9826e45b262df",
+      "item": {
+        "type": "markdown",
+        "id": "a5d9826e45b262df",
+        "text": "> The machine you are sitting at hears you first."
+      },
+      "after": "40e16ff3d29ba719",
+      "date": 1791810154561
+    },
+    {
+      "type": "add",
+      "id": "684c4c7eafcb5ba4",
+      "item": {
+        "type": "markdown",
+        "id": "684c4c7eafcb5ba4",
+        "text": "A recording is normally sent to the farm serving the page. When the browser is on a machine that runs a farm of its own \u2014 a laptop with the private farm up \u2014 the Voice Tool asks that machine first: it probes `http://localhost:4242/system/api.json` once per page load, and if a farm answers whose *hear* operation is gated on the place alone, the recording goes through that **local door** instead. Only the audio travels; the transcript comes back, and the page, the prompt, the summary and any kept audio stay with the farm the page lives on. The status line says where the words were heard \u2014 *transcribing on this Mac, with MacWhisper*, or *on the farm*."
+      },
+      "after": "a5d9826e45b262df",
+      "date": 1791810154561
+    },
+    {
+      "type": "add",
+      "id": "a98fea5ed4c38327",
+      "item": {
+        "type": "markdown",
+        "id": "a98fea5ed4c38327",
+        "text": "On a Mac the local farm hears with **MacWhisper** whenever that app is open, using the model the app has selected (Parakeet v3, say), and with faster-whisper when it is closed; the choice is made per recording, so opening the app changes the next one. The farm's `AUDIONOTE_ENGINE` can pin either engine; `AUDIONOTE_MACWHISPER_MODEL` names a model in MacWhisper's `engine:id` form, and `AUDIONOTE_MACWHISPER_PERSIST=1` also files each recording in MacWhisper's History."
+      },
+      "after": "684c4c7eafcb5ba4",
+      "date": 1791810154561
+    },
+    {
+      "type": "add",
+      "id": "5f6441159815ce82",
+      "item": {
+        "type": "markdown",
+        "id": "5f6441159815ce82",
+        "text": "`DOOR: farm` in the item sends every recording to the page's own farm and never probes; `DOOR: http://host:port` names a door of your own. The door answers a page from elsewhere without a login there because *hear* changes no page and keeps nothing \u2014 the farm transcribes from its temporary folder and deletes the file. A public farm still refuses it, as it refuses every write it has not been told to allow."
+      },
+      "after": "a98fea5ed4c38327",
+      "date": 1791810154561
     }
   ],
   "plugin": "audionote"

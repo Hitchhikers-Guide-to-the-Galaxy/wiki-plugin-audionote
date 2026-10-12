@@ -7,7 +7,9 @@
  * through documented operations rather than routes of its own:
  *
  *   /system/api/farm/assets/upload.json    the Farm plugin's shared asset upload
- *   /system/api/audionote/transcribe.json  faster-whisper, as a job
+ *   /system/api/audionote/transcribe.json  whisper over a kept recording, as a job
+ *   /system/api/audionote/hear.json        whisper over a recording sent as the body — here, or
+ *                                          through the local door (see localDoor below)
  *   /system/api/audionote/job.json         the job's progress
  *   /system/api/audionote/summarise.json   Claude, through a prompt
  *
@@ -132,27 +134,83 @@ export async function transcribe(slug, filename, onProgress = () => {}) {
  * Transcribe a recording that is NOT kept: the blob is sent as the body, read
  * from the farm's temporary folder and deleted. Nothing lands in the assets.
  */
-export async function hearBlob(blob, type, onProgress = () => {}) {
-  const res = await fetch('/system/api/audionote/hear.json', {
+export async function hearBlob(blob, type, onProgress = () => {}, door = null) {
+  const base = door?.base || ''
+  const res = await fetch(`${base}/system/api/audionote/hear.json`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/octet-stream', 'X-Recording-Type': type || blob.type || '' },
     body: blob,
   })
   if (!res.ok) throw await failure(res)
-  return followJob(await res.json(), onProgress)
+  return followJob(await res.json(), onProgress, base)
 }
 
-async function followJob(started, onProgress) {
-  onProgress({ state: started.state, ahead: started.ahead })
+async function followJob(started, onProgress, base = '') {
+  onProgress({ state: started.state, ahead: started.ahead, engine: started.engine, host: started.host })
   for (;;) {
     await new Promise(r => setTimeout(r, 1500))
-    const res = await fetch(`/system/api/audionote/job.json?id=${encodeURIComponent(started.job)}`)
+    const res = await fetch(`${base}/system/api/audionote/job.json?id=${encodeURIComponent(started.job)}`)
     if (!res.ok) throw await failure(res)
     const job = await res.json()
     onProgress(job)
-    if (job.state === 'done') return { provider: 'faster-whisper', ...job }
+    if (job.state === 'done') return { provider: 'faster-whisper', door: base ? 'local' : 'farm', ...job }
     if (job.state === 'failed') throw new Error(`transcription failed: ${job.error}`)
   }
+}
+
+// ---------- the local door ----------
+//
+// A recording is heard by the farm serving the page — unless the browser is on
+// a machine that runs a farm of its own, which is nearer, idle, and (on a Mac
+// with MacWhisper open) better. The Voice Tool asks that machine first: a farm
+// at one of a few local addresses whose hear operation is gated on the place
+// alone (x-fedwiki-gate: place), so it answers a page from elsewhere without a
+// login there. Nothing but the recording goes through the door; the transcript
+// comes back, and the page, the prompt and the summary stay with the farm the
+// page lives on.
+//
+//   DOOR: http://host:port   — the item names the door
+//   DOOR: farm               — never look for one
+//
+// Browsers treat http://localhost as a secure origin, so an https page may
+// call it; the answer is remembered for the page's lifetime, so a door that is
+// not there costs one short probe.
+
+const DOORS = ['http://localhost:4242']
+const isLocalHere = () => /^(localhost|127\.0\.0\.1|\[::1\])$|\.localhost$/.test(location.hostname)
+const doorProbes = new Map()
+
+const probeDoor = async base => {
+  const res = await fetch(`${base}/system/api.json`, { mode: 'cors', cache: 'no-store', signal: AbortSignal.timeout(2500) })
+  if (!res.ok) return null
+  const api = await res.json()
+  const hear = api?.paths?.['/system/api/audionote/hear.json']?.post
+  if (!hear || hear['x-fedwiki-gate'] !== 'place' || hear['x-fedwiki-cross-origin'] !== true) return null
+  return { base, host: api?.info?.['x-fedwiki-host'] || new URL(base).host }
+}
+
+/** The local door to use for this item, or null: the page's own farm. */
+export function localDoor(text = '') {
+  const named = ((text || '').match(/^\s*DOOR:\s*(\S+)/m) || [])[1]
+  if (named === 'farm' || named === 'none' || named === 'off') return Promise.resolve(null)
+  const candidates = named ? [named.replace(/\/$/, '')] : isLocalHere() ? [] : DOORS
+  const key = candidates.join(' ')
+  if (!candidates.length) return Promise.resolve(null)
+  if (!doorProbes.has(key)) {
+    doorProbes.set(
+      key,
+      (async () => {
+        for (const base of candidates) {
+          try {
+            const door = await probeDoor(base)
+            if (door) return door
+          } catch {}
+        }
+        return null
+      })(),
+    )
+  }
+  return doorProbes.get(key)
 }
 
 export const summarise = body => postJson('/system/api/audionote/summarise.json', body)

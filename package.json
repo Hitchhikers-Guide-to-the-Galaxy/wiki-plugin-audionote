@@ -1,6 +1,6 @@
 {
   "name": "wiki-plugin-audionote",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "description": "Federated Wiki - Audio Note Plugin: speak to a wiki page — record or drop audio, store it in the page assets, transcribe it with faster-whisper and add a summarised transcript",
   "keywords": [
     "audio",
@@ -30,7 +30,7 @@
   ],
   "scripts": {
     "build": "node scripts/build.js",
-    "test": "npm run version-file --silent && node test/fill.cjs && node test/discover.cjs && node --test test/clip.test.mjs",
+    "test": "npm run version-file --silent && node test/fill.cjs && node test/discover.cjs && node test/engine.cjs && node --test test/clip.test.mjs",
     "version-file": "node -e \"require('fs').writeFileSync('client/version.json', JSON.stringify({version: require('./package.json').version}) + '\\n')\"",
     "prepack": "npm run version-file"
   },
