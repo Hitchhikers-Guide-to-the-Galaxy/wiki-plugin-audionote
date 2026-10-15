@@ -904,6 +904,7 @@ const voiceHtml = item => `
     <div style="margin-top:6px;">
       <button class="an-ghost" disabled title="Open the notes as a ghost page under this title — drag items from it, or save it">Open as ghost page</button>
       <button class="an-add" disabled title="Save the notes as a new page of this title, and put a [[link]] to it on the page to the left (and on the clipboard)">Save page &amp; link it</button>
+      <button class="an-put" disabled title="Add the notes to the page on the left itself: under the prompt's SECTION heading when it names one (filling an unfilled card template there), otherwise before its See section">Add to this page</button>
     </div>
     <div class="an-status" style="font-size:.8em; color:#555; margin-top:4px; min-height:1.3em;">speak, or drop a recording</div>
     <p class="an-caption" style="font-style:italic; margin:6px 0 0;">${wiki.resolveLinks(itemCaption(item.text) || '')}</p>
@@ -938,7 +939,7 @@ function bindVoice($item, item) {
     keepbox: el('.an-keepbox'), keep: el('.an-keep'), folder: el('.an-folder'),
     titlebox: el('.an-titlebox'), title: el('.an-title'), redbox: el('.an-redbox'), red: el('.an-red'),
     levels: el('.an-levels'), busy: el('.an-busy'),
-    ghost: el('.an-ghost'), add: el('.an-add'), status: el('.an-status'),
+    ghost: el('.an-ghost'), add: el('.an-add'), put: el('.an-put'), status: el('.an-status'),
     $item,
   }
   // Every reach for the page goes through the session, so work begun by an
@@ -1015,7 +1016,7 @@ function bindVoice($item, item) {
     // Named to be kept: after the page spoken to, until the author names it themselves.
     if (!S.titleTouched) S.title = titlePattern.replace('{{page}}', t ? t.title : 'Voice').trim()
     if (document.activeElement !== ui.title) ui.title.value = S.title
-    ui.ghost.disabled = ui.add.disabled = !summarised || S.saving
+    ui.ghost.disabled = ui.add.disabled = ui.put.disabled = !summarised || S.saving
 
     ui.redbox.style.display = S.red.length ? '' : 'none'
     const options = ['<option value="">choose…</option>', ...S.red.map(r => `<option${r === S.title ? ' selected' : ''}>${esc(r)}</option>`)].join('')
@@ -1253,7 +1254,7 @@ function bindVoice($item, item) {
     try {
       const out = await summaryFor({ transcript: draft.transcript.text, $page: t?.$page, prompt: p, title: S.title })
       if (S.draft !== draft) return
-      draft.summary = { model: out.model, promptTitle: p?.title, promptFrom: p && !p.local ? p.from : '' } // where the prompt was read from, to fork in on save
+      draft.summary = { model: out.model, promptTitle: p?.title, promptFrom: p && !p.local ? p.from : '', section: p?.section || '' } // where the prompt was read from, to fork in on save
       draft.summaryText = out.markdown
       ui.preview.value = out.markdown
       persist()
@@ -1303,6 +1304,31 @@ function bindVoice($item, item) {
     const { title, kept } = await showGhost()
     say(`opened “${title}” — drag items from it, rename it on the page, or save it${kept ? '' : '; the recording was not kept'}`)
     paint()
+  })
+
+  // Into the page itself: a prompt with a SECTION says where its result belongs
+  // (Describe This Card fills the card page's Description); without one, the
+  // notes go before the page's See section.
+  ui.put.onclick = guard(async () => {
+    if (S.draft?.summaryText === undefined) return
+    const t = subject()
+    const why = t ? voice.cannotSave(t.$page) : 'there is no page to the left to add to'
+    if (why) throw new Error(why)
+    const section = S.draft.summary?.section || ''
+    S.saving = true
+    paint()
+    try {
+      const done = await voice.addToPage(t.$page, S.draft.summaryText, { section })
+      say(
+        done.how === 'replaced'
+          ? `filled the ${section} template on ${t.title}`
+          : done.how === 'section'
+            ? `added ${done.count} item${done.count === 1 ? '' : 's'} at the end of ${section} on ${t.title}`
+            : `added ${done.count} item${done.count === 1 ? '' : 's'} to ${t.title}${section ? ` (no ${section} heading there)` : ''}`,
+      )
+    } finally {
+      S.saving = false
+    }
   })
 
   // A link, not a copy: the notes become a page of their own, named by the
@@ -1527,7 +1553,7 @@ function bindTranscript($item, item) {
   const transcript = transcriptOf(item.text)
   const $page = () => ownPage(S.$item)
   const say = text => ((S.status = text), (el('.an-status').textContent = text))
-  const persist = () => voice.saveDraft(`tx:${item.id}`, { summaryText: S.summaryText, promptTitle: S.promptTitle || '' })
+  const persist = () => voice.saveDraft(`tx:${item.id}`, { summaryText: S.summaryText, promptTitle: S.promptTitle || '', promptSection: S.promptSection || '' })
 
   const paint = () => {
     const words = transcript ? transcript.split(/\s+/).length : 0
@@ -1566,6 +1592,7 @@ function bindTranscript($item, item) {
       const out = await summaryFor({ transcript, $page: $page(), prompt: p })
       S.summaryText = out.markdown
       S.promptTitle = p?.title || ''
+      S.promptSection = p?.section || ''
       persist()
       const fell = out.fellBackFrom ? ` (${out.fellBackFrom} could not be reached)` : ''
       say(`summary by ${out.model}${fell} — edit it, then open it as a ghost page or add it here`)
@@ -1591,14 +1618,18 @@ function bindTranscript($item, item) {
   el('.an-add').onclick = guard(async () => {
     const why = voice.cannotSave($page())
     if (why) throw new Error(why)
-    const blocks = voice.splitMarkdown(S.summaryText)
-    if (!blocks.length) throw new Error('the summary is empty')
+    if (!voice.splitMarkdown(S.summaryText).length) throw new Error('the summary is empty')
     S.saving = true
     paint()
     try {
-      let after = item.id
-      for (const text of blocks) after = await voice.addItem($page(), after, { type: 'markdown', id: voice.randomId(), text })
-      say(`added ${blocks.length} item${blocks.length === 1 ? '' : 's'} beneath the transcript`)
+      // a prompt's SECTION places it; otherwise beneath the transcript, as ever
+      const section = S.promptSection || ''
+      const done = await voice.addToPage($page(), S.summaryText, { section, fallbackAfter: item.id })
+      say(
+        done.how === 'replaced'
+          ? `filled the ${section} template`
+          : `added ${done.count} item${done.count === 1 ? '' : 's'} ${done.how === 'section' ? `at the end of ${section}` : 'beneath the transcript'}`,
+      )
     } finally {
       S.saving = false
     }
@@ -1614,6 +1645,7 @@ function bindTranscript($item, item) {
       if (!found || S.summaryText !== undefined || found.summaryText === undefined) return
       S.summaryText = found.summaryText
       S.promptTitle = found.promptTitle
+      S.promptSection = found.promptSection || ''
       say('picked up your unsaved summary')
       paint()
     })

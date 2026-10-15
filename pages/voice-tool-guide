@@ -28,6 +28,11 @@
     },
     {
       "type": "markdown",
+      "id": "f7430138f9ab609f",
+      "text": "**Add to this page** puts the notes on the page to the left itself; a prompt whose header has `SECTION: Description` sends them under that heading, filling an unfilled card template there in place, and without one they go before the See section."
+    },
+    {
+      "type": "markdown",
       "id": "97cfe15c68a02c3d",
       "text": "# The Page a Note Makes"
     },
@@ -222,6 +227,18 @@
       },
       "date": 1791811272446,
       "provenance": "wiki-plugin-audionote"
+    },
+    {
+      "type": "add",
+      "id": "f7430138f9ab609f",
+      "item": {
+        "type": "markdown",
+        "id": "f7430138f9ab609f",
+        "text": "**Add to this page** puts the notes on the page to the left itself; a prompt whose header has `SECTION: Description` sends them under that heading, filling an unfilled card template there in place, and without one they go before the See section."
+      },
+      "after": "89bfe9a63877a917",
+      "date": 1792016196157,
+      "provenance": "Added by Claude Code (Opus 5.5), audionote 0.5.6, 2026-10-14: the SECTION field for the Kanban Plan's Describe This Card prompt."
     }
   ]
 }

@@ -224,6 +224,7 @@ export const summarise = body => postJson('/system/api/audionote/summarise.json'
 //   INPUT: transcript, page
 //   OUTPUT: markdown
 //   MODEL: claude-opus-5
+//   SECTION: Description        (optional: the heading the result goes under)
 //   ---
 //   …{{transcript}} {{page_title}} {{page_text}} {{title}} {{date}}…
 //   ({{title}} is the title the result will be saved under, a red link's question)
@@ -252,6 +253,7 @@ export function parsePrompt(page) {
     input: (fields.input || '').split(',').map(s => s.trim()).filter(Boolean),
     output: fields.output || 'markdown',
     model: fields.model || '',
+    section: (fields.section || '').replace(/^#+\s*/, '').trim(),
     body,
   }
 }
@@ -359,6 +361,91 @@ export function insertionPoint($page) {
   const see = story.findIndex(isSeeHeading)
   const before = see === -1 ? story[story.length - 1] : story[see - 1]
   return before ? before.id : null
+}
+
+// ---------- a prompt's SECTION: where on the page its result belongs ----------
+
+/** The label of a heading item ("# Description\n\n> …" → "Description"), or null. */
+export const headingOf = item => {
+  const m = String(item?.text || '').match(/^\s*#+\s*([^\n]*)/)
+  return m ? m[1].trim() : null
+}
+
+/** The board's description template: seven bold labels, nothing written after any of them. */
+export const BOARD_TEMPLATE = [
+  '**What has to be done / description:**',
+  '**Task owners:**',
+  '**Resources:**',
+  '**Deliverables:**',
+  '**Internal ddl:**',
+  '**Ddl:**',
+  '**Docs:**',
+]
+const squash = text => String(text || '').replace(/[\s ]+/g, '')
+
+/** Whether an item's text is only the unfilled template (whitespace and nbsp ignored). */
+export const isBoardTemplate = text => squash(text) === squash(BOARD_TEMPLATE.join('\n\n'))
+
+/**
+ * A section of a story: the heading item whose label matches (any number of
+ * hashes, case ignored) and the items after it up to the next item starting
+ * with "#", or the end. Returns { start, end } (end exclusive) or null.
+ */
+export function findSection(story, label) {
+  const want = String(label || '').replace(/^#+\s*/, '').trim().toLowerCase()
+  if (!want) return null
+  const start = story.findIndex(i => (headingOf(i) || '').toLowerCase() === want)
+  if (start === -1) return null
+  let end = start + 1
+  while (end < story.length && headingOf(story[end]) === null) end++
+  return { start, end }
+}
+
+/**
+ * Where a result goes in a section: { replace: id } when the section's body is
+ * exactly one markdown item holding only the unfilled board template (an edit
+ * keeps its id, which is how the mirror knows the body); otherwise
+ * { after: id } of the section's last item. null when there is no such section.
+ */
+export function sectionPlan(story, label) {
+  const sec = findSection(story, label)
+  if (!sec) return null
+  const body = story.slice(sec.start + 1, sec.end)
+  if (body.length === 1 && body[0].type === 'markdown' && isBoardTemplate(body[0].text)) return { replace: body[0].id }
+  return { after: story[sec.end - 1].id }
+}
+
+/** Replace one item's text, in the DOM and on the server, as a journal edit. */
+export async function replaceText($page, id, text) {
+  const story = ($page.data('data') || {}).story || []
+  const old = story.find(i => i.id === id) || {}
+  const item = { ...old, text }
+  const $item = $page.find('.story:first').children(`.item[data-id="${id}"]`)
+  if ($item.length) {
+    $item.data('item', item)
+    wiki.doPlugin($item.empty(), item)
+  }
+  await putAndWait($page, { type: 'edit', id, item })
+  return id
+}
+
+/**
+ * Add a prompt's result to a page. With a SECTION the page has: replace an
+ * unfilled board template there, or go after the section's last item. Without
+ * one, after `fallbackAfter` (default: before any "# See" section).
+ * Returns { how: 'replaced'|'section'|'fallback', count }.
+ */
+export async function addToPage($page, markdown, { section = '', fallbackAfter } = {}) {
+  const story = ($page.data('data') || {}).story || []
+  const plan = section ? sectionPlan(story, section) : null
+  if (plan?.replace) {
+    await replaceText($page, plan.replace, String(markdown || '').trim())
+    return { how: 'replaced', count: 1 }
+  }
+  const blocks = splitMarkdown(markdown)
+  let after = plan ? plan.after : fallbackAfter !== undefined ? fallbackAfter : insertionPoint($page)
+  for (const text of blocks) after = await addItem($page, after, { type: 'markdown', id: randomId(), text })
+  return { how: plan ? 'section' : 'fallback', count: blocks.length }
 }
 
 /** Add one item after `afterId`, in the DOM and on the server. Returns its id. */
