@@ -825,8 +825,69 @@ function promptPicker(selectOf, item, S) {
   return () => S.prompts?.[+selectOf().value]
 }
 
+// ---------- which model summarises (0.7.0) ----------
+//
+// A choice beside Summarise, remembered in this browser, to compare the doors
+// on the same transcript: Claude on the farm's Max account, qwen on the
+// MacMini (DNS-SD qwen._ollama._tcp) and the LLM coop's GPU machine
+// (DNS-SD coop._openai._tcp, llm_auto-big). "Prompt or farm default" leaves the
+// choice to the prompt's MODEL line, else the farm (wiki-claude-door >= 0.2.0).
+const MODELS = [
+  ['', 'prompt or farm default'],
+  ['claude-opus-5-5', 'Claude (Max account)'],
+  ['ollama:qwen3:4b', 'qwen3:4b on the MacMini'],
+  ['openai:llm_auto-big', 'Coop GPU: llm_auto-big'],
+]
+const MODEL_KEY = 'audionote:summary-model'
+const modelRowHtml = () => `
+    <div style="margin-top:4px; font-size:.9em; white-space:nowrap; overflow:hidden;">
+      Model <select class="an-model" style="max-width:55%;">${MODELS.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join('')}</select>
+      <span class="an-took" style="margin-left:6px; color:#666; font-size:.9em;" title="how long the last summary took, from this browser"></span>
+    </div>`
+const storedModel = () => {
+  try {
+    return localStorage.getItem(MODEL_KEY) || ''
+  } catch {
+    return ''
+  }
+}
+// Time a summary in the browser, so models can be compared by hand: a live
+// count while it works, then "took 42 s" with the model that wrote it.
+async function timed(root, run) {
+  const took = root.querySelector('.an-took')
+  const t0 = Date.now()
+  const secs = () => Math.round((Date.now() - t0) / 1000)
+  const tick = took ? setInterval(() => (took.textContent = `working… ${secs()} s`), 1000) : null
+  if (took) took.textContent = 'working… 0 s'
+  try {
+    const out = await run()
+    if (took) {
+      const who = String(out?.model || '').replace(/^claude-cli:/, '').replace(/^(openai|ollama):/, '')
+      took.textContent = `took ${secs()} s${who ? ` · ${who}` : ''}`
+    }
+    return out
+  } catch (e) {
+    if (took) took.textContent = `failed after ${secs()} s`
+    throw e
+  } finally {
+    clearInterval(tick)
+  }
+}
+
+function bindModel(root) {
+  const select = root.querySelector('.an-model')
+  if (!select) return () => ''
+  select.value = MODELS.some(([v]) => v === storedModel()) ? storedModel() : ''
+  select.onchange = () => {
+    try {
+      localStorage.setItem(MODEL_KEY, select.value)
+    } catch {}
+  }
+  return () => select.value
+}
+
 /** A transcript through a prompt (or the built-in plain summary) on the farm. */
-const summaryFor = ({ transcript, $page, prompt, title = '' }) =>
+const summaryFor = ({ transcript, $page, prompt, title = '', model = '' }) =>
   voice.summarise({
     transcript,
     pageTitle: $page ? pageTitle($page) : '',
@@ -834,7 +895,7 @@ const summaryFor = ({ transcript, $page, prompt, title = '' }) =>
     title: (title || '').trim().replace(/\s+/g, ' '), // the page the words will be saved under, for prompts that answer one question
 
     prompt: prompt?.body || '',
-    model: prompt?.model || undefined,
+    model: model || prompt?.model || undefined,
   })
 
 // ---------- the Voice Tool (SUBJECT) ----------
@@ -895,6 +956,7 @@ const voiceHtml = item => `
       Prompt <select class="an-prompt" style="max-width:62%;"><option>finding prompts…</option></select>
       <button class="an-summarise" disabled>Summarise</button>
     </div>
+    ${modelRowHtml()}
     <textarea class="an-preview" rows="9" placeholder="The summary appears here to read and edit."
       style="width:100%; box-sizing:border-box; margin-top:6px; font-size:.85em; display:none;"></textarea>
     <div class="an-keepbox" style="margin-top:6px; font-size:.85em; display:none;">
@@ -942,6 +1004,7 @@ function bindVoice($item, item) {
     ghost: el('.an-ghost'), add: el('.an-add'), put: el('.an-put'), status: el('.an-status'),
     $item,
   }
+  bindModel($item[0]) // the summary model choice, remembered in this browser
   // Every reach for the page goes through the session, so work begun by an
   // earlier bind — a take, a transcription, a summary — finishes on the item
   // that is on screen now. What the recorder sets (stopFn, pauseFn) is kept on
@@ -1252,7 +1315,10 @@ function bindVoice($item, item) {
     working(`summarising${p ? ` with ${p.title}` : ''}`)
     paint()
     try {
-      const out = await summaryFor({ transcript: draft.transcript.text, $page: t?.$page, prompt: p, title: S.title })
+      const model = ui.summarise.closest('.item')?.querySelector('.an-model')?.value || ''
+      const out = await timed(ui.summarise.closest('.item'), () =>
+        summaryFor({ transcript: draft.transcript.text, $page: t?.$page, prompt: p, title: S.title, model }),
+      )
       if (S.draft !== draft) return
       draft.summary = { model: out.model, promptTitle: p?.title, promptFrom: p && !p.local ? p.from : '', section: p?.section || '' } // where the prompt was read from, to fork in on save
       draft.summaryText = out.markdown
@@ -1506,7 +1572,7 @@ function bindClip($item, item) {
 // summary added to this page beneath the transcript. Its subject is the page it
 // sits on. Nothing is written without the owner's click.
 
-const TX_COMMANDS = new Set(['TRANSCRIPT', 'AUDIO', 'PROMPT', 'PROMPTS', 'KINDS', 'TITLE'])
+const TX_COMMANDS = new Set(['TRANSCRIPT', 'AUDIO', 'PROMPT', 'PROMPTS', 'KINDS', 'TITLE', 'DOOR'])
 const isTranscript = item => !isVoiceTool(item) && !!command(item.text, 'TRANSCRIPT')
 
 // Everything after the leading command lines is the transcript, verbatim — a
@@ -1527,6 +1593,9 @@ const transcriptHtml = item => {
   return `
   <div class="an-tx" style="background-color:#eee; padding:12px; border-radius:6px;">
     ${audio ? `<audio class="an-player" controls preload="none" src="${esc(audio)}" style="width:100%;"></audio>` : ''}
+    <div class="an-hear" style="margin-top:6px; font-size:.9em; display:none;">
+      <button class="an-transcribe" title="Hear the recording — on this Mac when it has a farm, else on the farm — and keep the transcript in this item">Transcribe</button>
+    </div>
     <details class="an-tbox" open style="margin-top:6px;">
       <summary style="cursor:pointer; font-size:.9em;">Transcript <span class="an-words" style="color:#666;"></span></summary>
       <div class="an-transcript" style="font-size:.85em; background:#fff; padding:6px 8px; border-radius:4px; max-height:16em; overflow:auto; white-space:pre-wrap;"></div>
@@ -1535,6 +1604,7 @@ const transcriptHtml = item => {
       Prompt <select class="an-prompt" style="max-width:62%;"><option>finding prompts…</option></select>
       <button class="an-summarise">Summarise</button>
     </div>
+    ${modelRowHtml()}
     <div class="an-warn" style="display:none; color:#c0392b; font-size:.9em; margin-top:6px;"></div>
     <textarea class="an-preview" rows="9" placeholder="The summary appears here to read and edit."
       style="width:100%; box-sizing:border-box; margin-top:6px; font-size:.85em; display:none;"></textarea>
@@ -1550,7 +1620,7 @@ function bindTranscript($item, item) {
   const S = sessionFor(`tx:${item.id}`)
   S.$item = $item
   const el = sel => S.$item.find(sel)[0] // the item now on screen, after any re-render
-  const transcript = transcriptOf(item.text)
+  let transcript = transcriptOf(item.text)
   const $page = () => ownPage(S.$item)
   const say = text => ((S.status = text), (el('.an-status').textContent = text))
   const persist = () => voice.saveDraft(`tx:${item.id}`, { summaryText: S.summaryText, promptTitle: S.promptTitle || '', promptSection: S.promptSection || '' })
@@ -1558,12 +1628,16 @@ function bindTranscript($item, item) {
   const paint = () => {
     const words = transcript ? transcript.split(/\s+/).length : 0
     el('.an-words').textContent = words ? `· ${words} words` : ''
-    el('.an-transcript').textContent = transcript || '(nothing was heard)'
+    el('.an-transcript').textContent = transcript || (command(item.text, 'AUDIO') ? '(not transcribed yet — press Transcribe)' : '(nothing was heard)')
     const notOwner = voice.ownerHere() === false
     const warn = el('.an-warn')
     warn.style.display = notOwner ? '' : 'none'
     warn.textContent = notOwner ? `log in to ${location.host} as its owner — the farm summarises only for the owner` : ''
     el('.an-summarise').disabled = !transcript || S.summarising || notOwner
+    // not heard yet (a drop or a webhook paged the audio only): offer Transcribe
+    const audio = command(item.text, 'AUDIO')?.arg
+    el('.an-hear').style.display = !transcript && audio ? '' : 'none'
+    el('.an-transcribe').disabled = S.hearing || notOwner
     const has = S.summaryText !== undefined
     const preview = el('.an-preview')
     preview.style.display = el('.an-actions').style.display = has ? '' : 'none'
@@ -1573,6 +1647,7 @@ function bindTranscript($item, item) {
   }
 
   const chosenPrompt = promptPicker(() => el('.an-prompt'), item, S)
+  const chosenModel = bindModel(S.$item[0])
   const guard = fn => async () => {
     try {
       await fn()
@@ -1589,7 +1664,7 @@ function bindTranscript($item, item) {
     say(`summarising${p ? ` with ${p.title}` : ''} on the farm…`)
     paint()
     try {
-      const out = await summaryFor({ transcript, $page: $page(), prompt: p })
+      const out = await timed(S.$item[0], () => summaryFor({ transcript, $page: $page(), prompt: p, model: chosenModel() }))
       S.summaryText = out.markdown
       S.promptTitle = p?.title || ''
       S.promptSection = p?.section || ''
@@ -1598,6 +1673,42 @@ function bindTranscript($item, item) {
       say(`summary by ${out.model}${fell} — edit it, then open it as a ghost page or add it here`)
     } finally {
       S.summarising = false
+    }
+  })
+
+  // Transcribe: the same hear door as the Voice Tool (voice.js localDoor →
+  // hearBlob); the transcript is written into this item as a journal edit, so
+  // search finds it, forks carry it, and Summarise works from it.
+  el('.an-transcribe').onclick = guard(async () => {
+    const why = voice.cannotSave($page())
+    if (why) throw new Error(why)
+    const audio = command(item.text, 'AUDIO')?.arg
+    S.hearing = true
+    say('fetching the recording…')
+    paint()
+    try {
+      const res = await fetch(audio)
+      if (!res.ok) throw new Error(`the recording did not load (${res.status})`)
+      const blob = await res.blob()
+      say('looking for a local door…')
+      const door = await voice.localDoor(item.text)
+      const where = job =>
+        door ? (job?.engine === 'macwhisper' ? 'this Mac, with MacWhisper' : `this machine${job?.host ? ` (${job.host})` : ''}`) : 'the farm'
+      const heard = await voice.hearBlob(
+        blob,
+        blob.type || 'audio/mpeg',
+        job => say(job.state === 'queued' ? `transcription queued${job.ahead ? ` behind ${job.ahead}` : ''}…` : `transcribing on ${where(job)}…`),
+        door,
+      )
+      const text = (heard.text || '').trim()
+      const head = String(item.text || '').split('\n').filter(l => {
+        const m = l.trim().match(/^([A-Z][A-Z0-9_]+)(:|$)/)
+        return m && TX_COMMANDS.has(m[1])
+      })
+      say(`transcribed ${Math.round(heard.duration || 0)}s on ${where(heard)} — saving`)
+      await voice.replaceText($page(), item.id, [...head, text || '(nothing was heard)'].join('\n'))
+    } finally {
+      S.hearing = false
     }
   })
 

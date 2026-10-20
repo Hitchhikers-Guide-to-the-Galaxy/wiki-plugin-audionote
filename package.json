@@ -1,6 +1,6 @@
 {
   "name": "wiki-plugin-audionote",
-  "version": "0.5.7",
+  "version": "0.7.1",
   "description": "Federated Wiki - Audio Note Plugin: speak to a wiki page — record or drop audio, store it in the page assets, transcribe it with faster-whisper and add a summarised transcript",
   "keywords": [
     "audio",
