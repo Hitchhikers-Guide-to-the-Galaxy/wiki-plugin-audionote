@@ -21,6 +21,8 @@
 //                 Max account, no API key ("claude-cli:claude-opus-5") — or an
 //                 Ollama model for a farm off the network ("ollama:gemma3:4b");
 //                 a fallback model is tried when the first cannot be reached.
+//                 "auto" lets the farm pick per summary by the question's size
+//                 (Auto Model Plan, Phase 5) — see autoPick below.
 //
 // CommonJS: the farm imports handlers with import(), which takes either.
 
@@ -333,13 +335,63 @@ const ask = async (model, content) => {
   return out
 }
 
-const summarise = async ({ transcript, pageTitle, pageText, title, prompt, model }) => {
+// ---------- Auto (0.8.0): the Voice Tool shares the Plan Tool's rule, as far as it fits ----------
+//
+// The Plan Tool's Auto (Auto Model Plan) weighs a run by its size, its
+// answered questions, its open phases, the pages of a site and the action a
+// row asks. A summary has none of those but the first: it is one transcript
+// and one page through one prompt, so the only signal that fits is how big
+// the question is. The rule here is that one signal, with the same threshold:
+// over AUDIONOTE_AUTO_BIG_TOKENS (default 48k, the Plan Tool's
+// PLAN_AUTO_BIG_TOKENS) the tier is big, else light. The door's autoModel
+// turns the tier into a model it reaches now that holds the question with
+// AUTO_ROOM to answer in: the coop's own router (llm_auto-big, or
+// AUDIONOTE_AUTO_LIGHT) for light, Claude Fable 5.1 (or AUDIONOTE_AUTO_BIG)
+// for big, and Claude when the coop is down or cannot hold it. The pick and
+// its reason come back on the answer as `auto`, and the status line in the
+// browser says `auto → model: reason`, as the Plan Tool's does.
+const AUTO_BIG_TOKENS = 48000
+const AUTO_ROOM = 4096 // a summary is short; the door's own answer allowance
+
+/** The Voice Tool's tier for a question of `tokens`: {tier, why}. Size alone decides. */
+const voiceTier = ({ tokens = 0, bigTokens = AUTO_BIG_TOKENS } = {}) => {
+  const label = tokens >= 1000 ? `${Math.round(tokens / 1000)}k` : String(tokens)
+  return { tier: tokens > bigTokens ? 'big' : 'light', why: `${label} tokens` }
+}
+
+/** A status line for a pick: auto → glm-5.3-flash-pp: 9k tokens (routes to …), or auto → claude-fable-5-1 (big): 52k tokens. */
+const autoLine = auto => {
+  if (!auto || !auto.model) return ''
+  const name = String(auto.model).replace(/^(openai:llm_|openai:|ollama:|claude-cli:)/, '')
+  const tier = auto.tier && auto.tier !== 'light' ? ` (${auto.tier})` : ''
+  return `auto → ${name}${tier}: ${auto.why}${auto.note ? ` (${auto.note})` : ''}`
+}
+
+/**
+ * Auto's pick for one summary: {asked, tier, why, model, note, tokens, line}.
+ * `doors` is listModels' answer when the caller has it (the tests); else the
+ * door is asked, which it remembers for a minute. No model that holds the
+ * question is a 400 with the reason, never a silent cut.
+ */
+const autoPick = async (content, { system = SYSTEM, doors = null } = {}) => {
+  const { estimateTokens, listModels, autoModel } = await doorReady()
+  const need = estimateTokens(system) + estimateTokens(content)
+  const t = voiceTier({ tokens: need, bigTokens: +process.env.AUDIONOTE_AUTO_BIG_TOKENS || AUTO_BIG_TOKENS })
+  const list = doors || (await listModels()).doors
+  const r = autoModel({ tier: t.tier, need, doors: list, answer: AUTO_ROOM, light: process.env.AUDIONOTE_AUTO_LIGHT || '', big: process.env.AUDIONOTE_AUTO_BIG || '' })
+  const auto = { asked: t.tier, tier: r.tier, why: t.why, model: r.model, note: r.note || '', tokens: need }
+  if (!r.model) throw problem(400, `auto found no model for this summary (${t.why}): ${r.note}`)
+  return { ...auto, line: autoLine(auto) }
+}
+
+const summarise = async ({ transcript, pageTitle, pageText, title, prompt, model }, { doors = null } = {}) => {
   const t = String(transcript || '').trim()
   if (!t) throw problem(400, 'there is no transcript to summarise')
   const { MODEL_ID, defaultModel, fallbackModel } = await doorReady()
   const DEFAULT_MODEL = defaultModel('claude-opus-5')
   const FALLBACK_MODEL = fallbackModel()
-  const chosen = typeof model === 'string' && MODEL_ID.test(model) ? model : DEFAULT_MODEL
+  const auto = model === 'auto'
+  let chosen = !auto && typeof model === 'string' && MODEL_ID.test(model) ? model : DEFAULT_MODEL
   const template =
     String(prompt || '').trim() ||
     'Summarise what was said about the page "{{page_title}}" as a few short paragraphs or a bullet list.\n\n<page>\n{{page_text}}\n</page>\n\n<transcript>\n{{transcript}}\n</transcript>'
@@ -350,13 +402,19 @@ const summarise = async ({ transcript, pageTitle, pageText, title, prompt, model
     title: String(title || '').trim(), // the page the words will be saved under, often a red link's question
     date: new Date().toISOString().slice(0, 10),
   })
+  let picked = null
+  if (auto) {
+    picked = await autoPick(content, { doors })
+    chosen = picked.model
+  }
+  const withPick = out => (picked ? { ...out, auto: picked } : out)
   try {
-    return await ask(door(chosen), content)
+    return withPick(await ask(door(chosen), content))
   } catch (e) {
     if (!e.unreachable || !FALLBACK_MODEL || FALLBACK_MODEL === chosen) throw e
     const out = await ask(FALLBACK_MODEL, content)
-    return { ...out, fellBackFrom: chosen, why: e.message }
+    return withPick({ ...out, fellBackFrom: chosen, why: e.message })
   }
 }
 
-module.exports = { transcribe, hear, job, summarise, fill, door, engine, fromMacWhisper, macwhisperUp }
+module.exports = { transcribe, hear, job, summarise, fill, door, engine, fromMacWhisper, macwhisperUp, voiceTier, autoPick, autoLine, AUTO_BIG_TOKENS, AUTO_ROOM }

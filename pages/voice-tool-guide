@@ -19,12 +19,12 @@
     {
       "type": "markdown",
       "id": "07f87184712bea22",
-      "text": "Beside the title, **a page it is waiting for** lists the red links on the page to the left — pages it links to that nobody has written yet. Choose one and the notes take that name; saving turns the red link blue, so no new link is needed. Write an **Open Questions** list as red question links, `- [ ] [[Who may open an event?]]`, each question its own item, with no page behind the link, and the tool offers each question as a title. The [[Plan Tool]]'s Answer link opens the Voice Tool with the question already chosen."
+      "text": "Beside the title, **a page it is waiting for** lists the red links on the page to the left \u2014 pages it links to that nobody has written yet. Choose one and the notes take that name; saving turns the red link blue, so no new link is needed. Write an **Open Questions** list as red question links, `- [ ] [[Who may open an event?]]`, each question its own item, with no page behind the link, and the tool offers each question as a title. The [[Plan Tool]]'s Answer link opens the Voice Tool with the question already chosen."
     },
     {
       "type": "markdown",
       "id": "89bfe9a63877a917",
-      "text": "**Save page & link it** puts the `[[link]]` on the page to the left before its See section and copies it to the clipboard — drag the link beside the question it answers. Change the title for each question and a series of linked notes pages builds up. A title that already exists here is refused rather than overwritten. A recording picked up without its transcript — the farm refused it, or the network dropped — shows a **↻ Transcribe** button, so the audio is sent again rather than spoken again."
+      "text": "**Save page & link it** puts the `[[link]]` on the page to the left before its See section and copies it to the clipboard \u2014 drag the link beside the question it answers. Change the title for each question and a series of linked notes pages builds up. A title that already exists here is refused rather than overwritten. A recording picked up without its transcript \u2014 the farm refused it, or the network dropped \u2014 shows a **\u21bb Transcribe** button, so the audio is sent again rather than spoken again."
     },
     {
       "type": "markdown",
@@ -44,7 +44,7 @@
     {
       "type": "markdown",
       "id": "89ad9fd4b91a2403",
-      "text": "The page starts with the summary, each point its own item, with no heading or date above it — the question is the title and the journal keeps the date. It ends with a **# See** section linking back to the page it answers and to the prompt that shaped the summary; when that prompt was read from the prompt wiki, saving the page forks that site in (a fork event first in the journal, which hands over no credit), so the prompt link leads there. The transcript follows the answer under its own heading. With *keep the audio* ticked, an audio player captioned with the title and date, and the folder's assets (the recording and its transcript .txt), take the transcript's place."
+      "text": "The page starts with the summary, each point its own item, with no heading or date above it \u2014 the question is the title and the journal keeps the date. It ends with a **# See** section linking back to the page it answers and to the prompt that shaped the summary; when that prompt was read from the prompt wiki, saving the page forks that site in (a fork event first in the journal, which hands over no credit), so the prompt link leads there. The transcript follows the answer under its own heading. With *keep the audio* ticked, an audio player captioned with the title and date, and the folder's assets (the recording and its transcript .txt), take the transcript's place."
     },
     {
       "type": "markdown",
@@ -59,7 +59,7 @@
     {
       "type": "markdown",
       "id": "84081d7dc9ee8b3d",
-      "text": "`TITLE: {{page}} Notes` sets the pattern the title starts from. Prompts come from a prompt wiki (**PROMPTS:**, default prompt.geek.fish), read after this site; **PROMPT:** `[[Title]]` chooses one first and **KINDS:** limits which kinds are offered. Fork a prompt page to this site and your copy is the one used — see [[Prompt Format]]. `DOOR: farm` sends every recording to the page's own farm; `DOOR: http://host:port` names a local door of your own. On a phone, **record or choose a file** opens the phone's own recorder — the browser only allows the microphone itself over https."
+      "text": "`TITLE: {{page}} Notes` sets the pattern the title starts from. Prompts come from a prompt wiki (**PROMPTS:**, default prompt.geek.fish), read after this site; **PROMPT:** `[[Title]]` chooses one first and **KINDS:** limits which kinds are offered. Fork a prompt page to this site and your copy is the one used \u2014 see [[Prompt Format]]. `DOOR: farm` sends every recording to the page's own farm; `DOOR: http://host:port` names a local door of your own. On a phone, **record or choose a file** opens the phone's own recorder \u2014 the browser only allows the microphone itself over https."
     },
     {
       "type": "markdown",
@@ -74,7 +74,7 @@
     {
       "type": "markdown",
       "id": "521e8074a895e2d7",
-      "text": "A recording is normally sent to the farm serving the page. When the browser is on a machine that runs a farm of its own — a laptop with the private farm up — the Voice Tool asks that machine first: it probes `http://localhost:4242/system/api.json` once per page load, and if a farm answers whose *hear* operation is gated on the place alone, the recording goes through that **local door** instead. Only the audio travels; the transcript comes back, and the page, the prompt, the summary and any kept audio stay with the farm the page lives on. The status line says where the words were heard — *transcribing on this Mac, with MacWhisper*, or *on the farm*."
+      "text": "A recording is normally sent to the farm serving the page. When the browser is on a machine that runs a farm of its own \u2014 a laptop with the private farm up \u2014 the Voice Tool asks that machine first: it probes `http://localhost:4242/system/api.json` once per page load, and if a farm answers whose *hear* operation is gated on the place alone, the recording goes through that **local door** instead. Only the audio travels; the transcript comes back, and the page, the prompt, the summary and any kept audio stay with the farm the page lives on. The status line says where the words were heard \u2014 *transcribing on this Mac, with MacWhisper*, or *on the farm*."
     },
     {
       "type": "markdown",
@@ -84,7 +84,17 @@
     {
       "type": "markdown",
       "id": "c4d60bc91b88d243",
-      "text": "The door answers a page from elsewhere without a login there because *hear* changes no page and keeps nothing — the farm transcribes from its temporary folder and deletes the file. In the Farm plugin's terms the operation is declared `x-fedwiki-gate: place` and `x-fedwiki-cross-origin: true`. A public farm still refuses it, as it refuses every write it has not been told to allow."
+      "text": "The door answers a page from elsewhere without a login there because *hear* changes no page and keeps nothing \u2014 the farm transcribes from its temporary folder and deletes the file. In the Farm plugin's terms the operation is declared `x-fedwiki-gate: place` and `x-fedwiki-cross-origin: true`. A public farm still refuses it, as it refuses every write it has not been told to allow."
+    },
+    {
+      "type": "markdown",
+      "id": "ccaeeb5e1549dbb9",
+      "text": "# Choosing the Model\n> Name a door, or let the farm pick by size."
+    },
+    {
+      "type": "markdown",
+      "id": "7f15db6d1d82fc38",
+      "text": "The Model choice beside Summarise is remembered in this browser. *Prompt or farm default* leaves it to the prompt's `MODEL:` line, else the farm's `CLAUDE_DOOR_MODEL`. The named doors are for comparing the same transcript by hand: Claude on the farm's Max account, qwen3 on the MacMini, the coop's GPU through its own router. *Auto* is for everyday use: the farm measures the question \u2014 the prompt, the transcript and the page \u2014 and picks per summary, Claude Fable above 48k tokens, the coop's routing below it, Claude when the coop is down. It is the [[Plan Tool]]'s rule from the [[Auto Model Plan]], shared as far as a summary shares its signals, which is size alone. The *took* counter beside the choice shows how long the summary took and who wrote it, and the status line says why Auto chose as it did."
     },
     {
       "type": "markdown",
@@ -99,7 +109,7 @@
     {
       "type": "markdown",
       "id": "ed7f2d54ff67e605",
-      "text": "The Voice Tool's three writes — hear, transcribe and summarise — spend the farm's machine and model, so on a site reachable from the open internet they follow the farm owner's spend policy (Farm plugin 0.10.0). With `FARM_API_SPEND=authors` the signed-in owner of any site on the farm may use them; with the default, `private`, they are refused on public sites with a 403 that names the setting. A private farm behind a tailnet names its private sites with `FARM_API_PRIVATE_SUFFIXES`. Keeping the audio uploads through `farm.assetsUpload`, a plain write, which the site's owner may always make unless the farm lists it in `FARM_API_PUBLIC_REFUSE`."
+      "text": "The Voice Tool's three writes \u2014 hear, transcribe and summarise \u2014 spend the farm's machine and model, so on a site reachable from the open internet they follow the farm owner's spend policy (Farm plugin 0.10.0). With `FARM_API_SPEND=authors` the signed-in owner of any site on the farm may use them; with the default, `private`, they are refused on public sites with a 403 that names the setting. A private farm behind a tailnet names its private sites with `FARM_API_PRIVATE_SUFFIXES`. Keeping the audio uploads through `farm.assetsUpload`, a plain write, which the site's owner may always make unless the farm lists it in `FARM_API_PUBLIC_REFUSE`."
     },
     {
       "type": "markdown",
@@ -136,12 +146,12 @@
           {
             "type": "markdown",
             "id": "07f87184712bea22",
-            "text": "Beside the title, **a page it is waiting for** lists the red links on the page to the left — pages it links to that nobody has written yet. Choose one and the notes take that name; saving turns the red link blue, so no new link is needed. Write an **Open Questions** list as red question links, `- [ ] [[Who may open an event?]]`, each question its own item, with no page behind the link, and the tool offers each question as a title. The [[Plan Tool]]'s Answer link opens the Voice Tool with the question already chosen."
+            "text": "Beside the title, **a page it is waiting for** lists the red links on the page to the left \u2014 pages it links to that nobody has written yet. Choose one and the notes take that name; saving turns the red link blue, so no new link is needed. Write an **Open Questions** list as red question links, `- [ ] [[Who may open an event?]]`, each question its own item, with no page behind the link, and the tool offers each question as a title. The [[Plan Tool]]'s Answer link opens the Voice Tool with the question already chosen."
           },
           {
             "type": "markdown",
             "id": "89bfe9a63877a917",
-            "text": "**Save page & link it** puts the `[[link]]` on the page to the left before its See section and copies it to the clipboard — drag the link beside the question it answers. Change the title for each question and a series of linked notes pages builds up. A title that already exists here is refused rather than overwritten. A recording picked up without its transcript — the farm refused it, or the network dropped — shows a **↻ Transcribe** button, so the audio is sent again rather than spoken again."
+            "text": "**Save page & link it** puts the `[[link]]` on the page to the left before its See section and copies it to the clipboard \u2014 drag the link beside the question it answers. Change the title for each question and a series of linked notes pages builds up. A title that already exists here is refused rather than overwritten. A recording picked up without its transcript \u2014 the farm refused it, or the network dropped \u2014 shows a **\u21bb Transcribe** button, so the audio is sent again rather than spoken again."
           },
           {
             "type": "markdown",
@@ -156,7 +166,7 @@
           {
             "type": "markdown",
             "id": "89ad9fd4b91a2403",
-            "text": "The page starts with the summary, each point its own item, with no heading or date above it — the question is the title and the journal keeps the date. It ends with a **# See** section linking back to the page it answers and to the prompt that shaped the summary; when that prompt was read from the prompt wiki, saving the page forks that site in (a fork event first in the journal, which hands over no credit), so the prompt link leads there. The transcript follows the answer under its own heading. With *keep the audio* ticked, an audio player captioned with the title and date, and the folder's assets (the recording and its transcript .txt), take the transcript's place."
+            "text": "The page starts with the summary, each point its own item, with no heading or date above it \u2014 the question is the title and the journal keeps the date. It ends with a **# See** section linking back to the page it answers and to the prompt that shaped the summary; when that prompt was read from the prompt wiki, saving the page forks that site in (a fork event first in the journal, which hands over no credit), so the prompt link leads there. The transcript follows the answer under its own heading. With *keep the audio* ticked, an audio player captioned with the title and date, and the folder's assets (the recording and its transcript .txt), take the transcript's place."
           },
           {
             "type": "markdown",
@@ -171,7 +181,7 @@
           {
             "type": "markdown",
             "id": "84081d7dc9ee8b3d",
-            "text": "`TITLE: {{page}} Notes` sets the pattern the title starts from. Prompts come from a prompt wiki (**PROMPTS:**, default prompt.geek.fish), read after this site; **PROMPT:** `[[Title]]` chooses one first and **KINDS:** limits which kinds are offered. Fork a prompt page to this site and your copy is the one used — see [[Prompt Format]]. `DOOR: farm` sends every recording to the page's own farm; `DOOR: http://host:port` names a local door of your own. On a phone, **record or choose a file** opens the phone's own recorder — the browser only allows the microphone itself over https."
+            "text": "`TITLE: {{page}} Notes` sets the pattern the title starts from. Prompts come from a prompt wiki (**PROMPTS:**, default prompt.geek.fish), read after this site; **PROMPT:** `[[Title]]` chooses one first and **KINDS:** limits which kinds are offered. Fork a prompt page to this site and your copy is the one used \u2014 see [[Prompt Format]]. `DOOR: farm` sends every recording to the page's own farm; `DOOR: http://host:port` names a local door of your own. On a phone, **record or choose a file** opens the phone's own recorder \u2014 the browser only allows the microphone itself over https."
           },
           {
             "type": "markdown",
@@ -186,7 +196,7 @@
           {
             "type": "markdown",
             "id": "521e8074a895e2d7",
-            "text": "A recording is normally sent to the farm serving the page. When the browser is on a machine that runs a farm of its own — a laptop with the private farm up — the Voice Tool asks that machine first: it probes `http://localhost:4242/system/api.json` once per page load, and if a farm answers whose *hear* operation is gated on the place alone, the recording goes through that **local door** instead. Only the audio travels; the transcript comes back, and the page, the prompt, the summary and any kept audio stay with the farm the page lives on. The status line says where the words were heard — *transcribing on this Mac, with MacWhisper*, or *on the farm*."
+            "text": "A recording is normally sent to the farm serving the page. When the browser is on a machine that runs a farm of its own \u2014 a laptop with the private farm up \u2014 the Voice Tool asks that machine first: it probes `http://localhost:4242/system/api.json` once per page load, and if a farm answers whose *hear* operation is gated on the place alone, the recording goes through that **local door** instead. Only the audio travels; the transcript comes back, and the page, the prompt, the summary and any kept audio stay with the farm the page lives on. The status line says where the words were heard \u2014 *transcribing on this Mac, with MacWhisper*, or *on the farm*."
           },
           {
             "type": "markdown",
@@ -196,7 +206,7 @@
           {
             "type": "markdown",
             "id": "c4d60bc91b88d243",
-            "text": "The door answers a page from elsewhere without a login there because *hear* changes no page and keeps nothing — the farm transcribes from its temporary folder and deletes the file. In the Farm plugin's terms the operation is declared `x-fedwiki-gate: place` and `x-fedwiki-cross-origin: true`. A public farm still refuses it, as it refuses every write it has not been told to allow."
+            "text": "The door answers a page from elsewhere without a login there because *hear* changes no page and keeps nothing \u2014 the farm transcribes from its temporary folder and deletes the file. In the Farm plugin's terms the operation is declared `x-fedwiki-gate: place` and `x-fedwiki-cross-origin: true`. A public farm still refuses it, as it refuses every write it has not been told to allow."
           },
           {
             "type": "markdown",
@@ -211,7 +221,7 @@
           {
             "type": "markdown",
             "id": "ed7f2d54ff67e605",
-            "text": "On a farm whose sites are reachable from the open internet, the Voice Tool's three writes — hear, transcribe and summarise — are refused with **403 \"is not a private site, and this farm has not been asked to allow writes to public ones\"** until the person running the farm lists them. The Farm plugin asks two questions in order: is this farm willing to take API writes on public sites at all, and may this caller edit this site. The first is answered by the farm's environment, the second by the wiki's own login. A private farm behind a tailnet answers the first with `FARM_API_PRIVATE_SUFFIXES`; a public farm needs `FARM_API_PUBLIC_WRITES=audionote.hear,audionote.transcribe,audionote.summarise,farm.assetsUpload`. Every scope is needed: listing only `audionote.hear` lets the transcript through and fails at summarise, and *keep the audio* uploads through the Farm plugin's own `farm.assetsUpload`, which is refused until it is listed too. The blanket value `1` would open every page-changing operation on the farm, including table writes and index rebuilds, and should not be used."
+            "text": "On a farm whose sites are reachable from the open internet, the Voice Tool's three writes \u2014 hear, transcribe and summarise \u2014 are refused with **403 \"is not a private site, and this farm has not been asked to allow writes to public ones\"** until the person running the farm lists them. The Farm plugin asks two questions in order: is this farm willing to take API writes on public sites at all, and may this caller edit this site. The first is answered by the farm's environment, the second by the wiki's own login. A private farm behind a tailnet answers the first with `FARM_API_PRIVATE_SUFFIXES`; a public farm needs `FARM_API_PUBLIC_WRITES=audionote.hear,audionote.transcribe,audionote.summarise,farm.assetsUpload`. Every scope is needed: listing only `audionote.hear` lets the transcript through and fails at summarise, and *keep the audio* uploads through the Farm plugin's own `farm.assetsUpload`, which is refused until it is listed too. The blanket value `1` would open every page-changing operation on the farm, including table writes and index rebuilds, and should not be used."
           },
           {
             "type": "markdown",
@@ -246,9 +256,33 @@
       "item": {
         "type": "markdown",
         "id": "ed7f2d54ff67e605",
-        "text": "The Voice Tool's three writes — hear, transcribe and summarise — spend the farm's machine and model, so on a site reachable from the open internet they follow the farm owner's spend policy (Farm plugin 0.10.0). With `FARM_API_SPEND=authors` the signed-in owner of any site on the farm may use them; with the default, `private`, they are refused on public sites with a 403 that names the setting. A private farm behind a tailnet names its private sites with `FARM_API_PRIVATE_SUFFIXES`. Keeping the audio uploads through `farm.assetsUpload`, a plain write, which the site's owner may always make unless the farm lists it in `FARM_API_PUBLIC_REFUSE`."
+        "text": "The Voice Tool's three writes \u2014 hear, transcribe and summarise \u2014 spend the farm's machine and model, so on a site reachable from the open internet they follow the farm owner's spend policy (Farm plugin 0.10.0). With `FARM_API_SPEND=authors` the signed-in owner of any site on the farm may use them; with the default, `private`, they are refused on public sites with a 403 that names the setting. A private farm behind a tailnet names its private sites with `FARM_API_PRIVATE_SUFFIXES`. Keeping the audio uploads through `farm.assetsUpload`, a plain write, which the site's owner may always make unless the farm lists it in `FARM_API_PUBLIC_REFUSE`."
       },
       "date": 1792507074309
+    },
+    {
+      "type": "add",
+      "id": "ccaeeb5e1549dbb9",
+      "item": {
+        "type": "markdown",
+        "id": "ccaeeb5e1549dbb9",
+        "text": "# Choosing the Model\n> Name a door, or let the farm pick by size."
+      },
+      "after": "c4d60bc91b88d243",
+      "date": 1792527624955,
+      "provenance": "Auto Model Plan, Phase 5 \u2014 Claude Code, 2026-10-20"
+    },
+    {
+      "type": "add",
+      "id": "7f15db6d1d82fc38",
+      "item": {
+        "type": "markdown",
+        "id": "7f15db6d1d82fc38",
+        "text": "The Model choice beside Summarise is remembered in this browser. *Prompt or farm default* leaves it to the prompt's `MODEL:` line, else the farm's `CLAUDE_DOOR_MODEL`. The named doors are for comparing the same transcript by hand: Claude on the farm's Max account, qwen3 on the MacMini, the coop's GPU through its own router. *Auto* is for everyday use: the farm measures the question \u2014 the prompt, the transcript and the page \u2014 and picks per summary, Claude Fable above 48k tokens, the coop's routing below it, Claude when the coop is down. It is the [[Plan Tool]]'s rule from the [[Auto Model Plan]], shared as far as a summary shares its signals, which is size alone. The *took* counter beside the choice shows how long the summary took and who wrote it, and the status line says why Auto chose as it did."
+      },
+      "after": "ccaeeb5e1549dbb9",
+      "date": 1792527624955,
+      "provenance": "Auto Model Plan, Phase 5 \u2014 Claude Code, 2026-10-20"
     }
   ]
 }

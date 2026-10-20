@@ -835,8 +835,14 @@ function promptPicker(selectOf, item, S) {
 // MacMini (DNS-SD qwen._ollama._tcp) and the LLM coop's GPU machine
 // (DNS-SD coop._openai._tcp, llm_auto-big). "Prompt or farm default" leaves the
 // choice to the prompt's MODEL line, else the farm (wiki-claude-door >= 0.2.0).
+// "Auto" (0.8.0) lets the farm pick per summary by the question's size — the
+// Plan Tool's rule as far as a summary shares it (Auto Model Plan, Phase 5):
+// Claude Fable for a question over 48k tokens, the coop's own routing for the
+// rest, Claude when the coop is down. The farm's answer carries the pick and
+// its reason as `auto`, said on the status line.
 const MODELS = [
   ['', 'prompt or farm default'],
+  ['auto', 'Auto: the farm picks by size'],
   ['claude-opus-5-5', 'Claude (Max account)'],
   ['ollama:qwen3:4b', 'qwen3:4b on the MacMini'],
   ['openai:llm_auto-big', 'Coop GPU: llm_auto-big'],
@@ -887,6 +893,13 @@ function bindModel(root) {
     } catch {}
   }
   return () => select.value
+}
+
+/** Who wrote a summary, for the status line: the model, Auto's pick and reason when the farm chose, and the fallback when the first could not be reached. */
+const wroteIt = out => {
+  const fell = out.fellBackFrom ? ` (${out.fellBackFrom} could not be reached)` : ''
+  const auto = out.auto?.line ? ` — ${out.auto.line}` : ''
+  return `${out.model}${fell}${auto}`
 }
 
 /** A transcript through a prompt (or the built-in plain summary) on the farm. */
@@ -1409,8 +1422,7 @@ function bindVoice($item, item) {
       draft.summaryText = out.markdown
       ui.preview.value = out.markdown
       persist()
-      const fell = out.fellBackFrom ? ` (${out.fellBackFrom} could not be reached)` : ''
-      say(`summary by ${out.model}${fell} — edit it, name the page, then open or save it`)
+      say(`summary by ${wroteIt(out)} — edit it, name the page, then open or save it`)
     } finally {
       S.summarising = false
       working(null)
@@ -1754,8 +1766,7 @@ function bindTranscript($item, item) {
       S.promptTitle = p?.title || ''
       S.promptSection = p?.section || ''
       persist()
-      const fell = out.fellBackFrom ? ` (${out.fellBackFrom} could not be reached)` : ''
-      say(`summary by ${out.model}${fell} — edit it, then open it as a ghost page or add it here`)
+      say(`summary by ${wroteIt(out)} — edit it, then open it as a ghost page or add it here`)
     } finally {
       S.summarising = false
     }

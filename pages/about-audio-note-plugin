@@ -83,6 +83,16 @@
     },
     {
       "type": "markdown",
+      "id": "dcda56ce9f56ad84",
+      "text": "# Auto\n> The farm picks the model, by size alone."
+    },
+    {
+      "type": "markdown",
+      "id": "8e7723c9d9d6f8e4",
+      "text": "The Model choice beside Summarise (0.7.0) names a door: Claude on the farm's account, qwen on the MacMini, the coop's GPU. *Auto* (0.8.0) leaves the choice to the farm, per summary. The [[Plan Tool]]'s Auto weighs a run by its size, its answered questions, its open phases and the pages of a site ([[Auto Model Plan]]); a summary is one transcript and one page through one prompt, so the only signal that fits is the size of the question, and that is the whole rule here: over `AUDIONOTE_AUTO_BIG_TOKENS` (48k, the Plan Tool's threshold) the tier is big and goes to Claude Fable 5.1 (`AUDIONOTE_AUTO_BIG`); everything smaller is light and goes to the coop's own router, `llm_auto-big` (`AUDIONOTE_AUTO_LIGHT`), which picks the model for its hardware. The coop down, or a question it cannot hold: Claude, and the reason says so. The pick comes back on the answer as `auto` \u2014 asked, tier, why, model, note, tokens and a line \u2014 and the status line reads it: *summary by openai:glm-5.3-flash \u2014 auto \u2192 auto-big: 1k tokens (routes to glm-5.3-flash-pp)*. `node test/auto.cjs` holds the rule still, without a network."
+    },
+    {
+      "type": "markdown",
       "id": "a4d10e6b22c91f08",
       "text": "# Repositories\n\n- GitHub \u2014 https://github.com/Hitchhikers-Guide-to-the-Galaxy/wiki-plugin-audionote\n- npm \u2014 https://www.npmjs.com/package/wiki-plugin-audionote"
     }
@@ -248,6 +258,30 @@
         "text": "The Voice Tool sends a recording through a **local door** when the browser's own machine runs a farm: it probes `http://localhost:4242` for a farm whose *hear* is declared `x-fedwiki-gate: place` and `x-fedwiki-cross-origin: true` (Farm plugin 0.9.1), and posts the audio there. `DOOR:` in the item names another door, or `farm` to never look. See [[Voice Tool]] and the [[Voice Tool Guide]]."
       },
       "date": 1791811272446
+    },
+    {
+      "type": "add",
+      "id": "dcda56ce9f56ad84",
+      "item": {
+        "type": "markdown",
+        "id": "dcda56ce9f56ad84",
+        "text": "# Auto\n> The farm picks the model, by size alone."
+      },
+      "after": "d5ac481911427212",
+      "date": 1792527624954,
+      "provenance": "Auto Model Plan, Phase 5 \u2014 Claude Code, 2026-10-20"
+    },
+    {
+      "type": "add",
+      "id": "8e7723c9d9d6f8e4",
+      "item": {
+        "type": "markdown",
+        "id": "8e7723c9d9d6f8e4",
+        "text": "The Model choice beside Summarise (0.7.0) names a door: Claude on the farm's account, qwen on the MacMini, the coop's GPU. *Auto* (0.8.0) leaves the choice to the farm, per summary. The [[Plan Tool]]'s Auto weighs a run by its size, its answered questions, its open phases and the pages of a site ([[Auto Model Plan]]); a summary is one transcript and one page through one prompt, so the only signal that fits is the size of the question, and that is the whole rule here: over `AUDIONOTE_AUTO_BIG_TOKENS` (48k, the Plan Tool's threshold) the tier is big and goes to Claude Fable 5.1 (`AUDIONOTE_AUTO_BIG`); everything smaller is light and goes to the coop's own router, `llm_auto-big` (`AUDIONOTE_AUTO_LIGHT`), which picks the model for its hardware. The coop down, or a question it cannot hold: Claude, and the reason says so. The pick comes back on the answer as `auto` \u2014 asked, tier, why, model, note, tokens and a line \u2014 and the status line reads it: *summary by openai:glm-5.3-flash \u2014 auto \u2192 auto-big: 1k tokens (routes to glm-5.3-flash-pp)*. `node test/auto.cjs` holds the rule still, without a network."
+      },
+      "after": "dcda56ce9f56ad84",
+      "date": 1792527624954,
+      "provenance": "Auto Model Plan, Phase 5 \u2014 Claude Code, 2026-10-20"
     }
   ],
   "plugin": "audionote"

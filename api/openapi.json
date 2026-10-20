@@ -3,7 +3,7 @@
   "info": {
     "title": "Audio Note",
     "version": "0.3.0",
-    "description": "Speak to a wiki page. A recording already stored in the site's assets (through the Farm plugin's assets upload) is transcribed on this farm with faster-whisper, and the transcript can be summarised by Claude through a prompt — usually one drawn from a prompt wiki. The recorder and the Voice Tool page use these; so can an agent."
+    "description": "Speak to a wiki page. A recording already stored in the site's assets (through the Farm plugin's assets upload) is transcribed on this farm with faster-whisper, and the transcript can be summarised by Claude through a prompt \u2014 usually one drawn from a prompt wiki. The recorder and the Voice Tool page use these; so can an agent."
   },
   "paths": {
     "/transcribe.json": {
@@ -88,7 +88,7 @@
     "/summarise.json": {
       "post": {
         "operationId": "summarise",
-        "summary": "Summarise a transcript through a prompt (Claude or Ollama)",
+        "summary": "Summarise a transcript through a prompt (Claude, the coop, Ollama, or auto)",
         "description": "Fills the prompt's {{transcript}}, {{page_title}}, {{page_text}} and {{date}} and asks Claude. Spends money, so it is gated like a write.",
         "x-fedwiki-writes": true,
         "x-fedwiki-spends": true,
@@ -123,7 +123,7 @@
                   },
                   "model": {
                     "type": "string",
-                    "description": "claude-<id> for the Claude API, claude-cli:claude-<id> for the Claude Code CLI under the account logged in on the farm machine (a Max subscription, no API key), or ollama:<name> for an Ollama model on this farm (AUDIONOTE_OLLAMA_URL). Default AUDIONOTE_SUMMARY_MODEL, else claude-opus-5; AUDIONOTE_FALLBACK_MODEL is tried when the first cannot be reached."
+                    "description": "claude-<id> for the Claude API, claude-cli:claude-<id> for the Claude Code CLI under the account logged in on the farm machine (a Max subscription, no API key), ollama:<name> for an Ollama model, openai:<name> for a model behind the coop's OpenAI-compatible door, or auto to let the farm pick per summary by the question's size: Claude Fable 5.1 over AUDIONOTE_AUTO_BIG_TOKENS (48k), else the coop's own routing (llm_auto-big), and Claude when the coop is down; the pick and its reason come back as `auto`. Default CLAUDE_DOOR_MODEL (AUDIONOTE_SUMMARY_MODEL), else claude-opus-5; CLAUDE_DOOR_FALLBACK_MODEL (AUDIONOTE_FALLBACK_MODEL) is tried when the first cannot be reached."
                   }
                 }
               }
@@ -132,7 +132,7 @@
         },
         "responses": {
           "200": {
-            "description": "markdown, and the model that wrote it."
+            "description": "markdown, the model that wrote it, and for auto the pick and its reason."
           },
           "422": {
             "description": "Claude declined."
@@ -147,7 +147,7 @@
       "post": {
         "operationId": "hear",
         "summary": "Transcribe a recording without keeping it",
-        "description": "The request body is the recording itself. It is transcribed from the farm's temporary folder and then deleted — nothing is added to the site's assets. Answers at once with a job to poll; the finished job carries the text and segments, which engine heard it (macwhisper where the MacWhisper app is running on the farm's machine, else faster-whisper) and the machine's host name. To keep the audio, upload it separately through the Farm plugin's assets upload. Gated on the place alone: a private farm answers any caller, so a browser on a laptop can send a recording to the laptop's own farm — the local door — instead of the farm serving the page; it changes no page and keeps nothing.",
+        "description": "The request body is the recording itself. It is transcribed from the farm's temporary folder and then deleted \u2014 nothing is added to the site's assets. Answers at once with a job to poll; the finished job carries the text and segments, which engine heard it (macwhisper where the MacWhisper app is running on the farm's machine, else faster-whisper) and the machine's host name. To keep the audio, upload it separately through the Farm plugin's assets upload. Gated on the place alone: a private farm answers any caller, so a browser on a laptop can send a recording to the laptop's own farm \u2014 the local door \u2014 instead of the farm serving the page; it changes no page and keeps nothing.",
         "x-fedwiki-writes": true,
         "x-fedwiki-spends": true,
         "x-fedwiki-context": [

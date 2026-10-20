@@ -32,6 +32,10 @@ The farm hears a recording with **faster-whisper** (`api/transcribe.py`, in `~/v
 
 The Voice Tool sends a recording to the farm serving the page — unless the browser is on a machine running a farm of its own. It probes `http://localhost:4242/system/api.json` once; a farm whose `hear` is declared `x-fedwiki-gate: place` and `x-fedwiki-cross-origin: true` (wiki-plugin-farm ≥ 0.9.1) hears the recording instead, without a login there, because hear changes no page and keeps nothing. `DOOR: url` in the item names a door, `DOOR: farm` never looks.
 
+## Auto — the farm picks the summary model
+
+The Model choice beside Summarise names a door (Claude on the farm's account, qwen on the MacMini, the coop's GPU) or **Auto** (0.8.0), which lets the farm pick per summary. It is the Plan Tool's rule from the Auto Model Plan, shared as far as a summary shares its signals — size alone: over `AUDIONOTE_AUTO_BIG_TOKENS` (48k) the question goes to Claude Fable 5.1 (`AUDIONOTE_AUTO_BIG`), anything smaller to the coop's own router `llm_auto-big` (`AUDIONOTE_AUTO_LIGHT`), and to Claude when the coop is down or cannot hold it. The answer carries the pick as `auto` (asked, tier, why, model, note, tokens, line) and the status line says `auto → model: reason`. `node test/auto.cjs` tests the rule without a network.
+
 ## Install
 
 ```
