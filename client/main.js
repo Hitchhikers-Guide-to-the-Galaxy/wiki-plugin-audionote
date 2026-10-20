@@ -41,6 +41,9 @@ const timestampName = (kind, extension) => {
 
 const extFor = mime => (mime.match(/audio\/(\w+)/) || [, 'bin'])[1]
 
+// The default button of a row (Save page & link it): filled and bold, so it reads first.
+const PRIMARY = 'font-weight:bold; background:#2f6fcf; color:#fff; border:1px solid #2559a8; border-radius:4px; padding:2px 10px;'
+
 const MIC_KEY = 'fedwiki-media:micId'
 
 
@@ -964,9 +967,9 @@ const voiceHtml = item => `
       <div style="color:#666;">Unticked, the recording is thrown away and only the text remains.</div>
     </div>
     <div style="margin-top:6px;">
-      <button class="an-ghost" disabled title="Open the notes as a ghost page under this title — drag items from it, or save it">Open as ghost page</button>
-      <button class="an-add" disabled title="Save the notes as a new page of this title, and put a [[link]] to it on the page to the left (and on the clipboard)">Save page &amp; link it</button>
       <button class="an-put" disabled title="Add the notes to the page on the left itself: under the prompt's SECTION heading when it names one (filling an unfilled card template there), otherwise before its See section">Add to this page</button>
+      <button class="an-ghost" disabled title="Open the notes as a ghost page under this title — drag items from it, or save it">Open as ghost page</button>
+      <button class="an-add" disabled style="${PRIMARY}" title="The default: save the notes as a new page of this title, and put a [[link]] to it on the page to the left (and on the clipboard). Enter in the page title presses it.">Save page &amp; link it</button>
     </div>
     <div class="an-status" style="font-size:.8em; color:#555; margin-top:4px; min-height:1.3em;">speak, or drop a recording</div>
     <p class="an-caption" style="font-style:italic; margin:6px 0 0;">${wiki.resolveLinks(itemCaption(item.text) || '')}</p>
@@ -1080,6 +1083,7 @@ function bindVoice($item, item) {
     if (!S.titleTouched) S.title = titlePattern.replace('{{page}}', t ? t.title : 'Voice').trim()
     if (document.activeElement !== ui.title) ui.title.value = S.title
     ui.ghost.disabled = ui.add.disabled = ui.put.disabled = !summarised || S.saving
+    ui.add.style.opacity = ui.add.disabled ? '.45' : '1'
 
     ui.redbox.style.display = S.red.length ? '' : 'none'
     const options = ['<option value="">choose…</option>', ...S.red.map(r => `<option${r === S.title ? ' selected' : ''}>${esc(r)}</option>`)].join('')
@@ -1094,8 +1098,17 @@ function bindVoice($item, item) {
   // The subject's red links, looked up once per subject (and again after a save).
   const findRed = t => {
     const key = t ? `${voice.siteOf(t.$page)}/${t.slug}` : ''
-    if (S.redFor === key) return S.redReady === key && waitingFor(S.red) && paint()
+    if (S.redFor === key) {
+      if (S.redReady !== key) return
+      // A question handed over that the list has not seen: the page may have
+      // changed since its red links were read (a Revise saved over the plan
+      // and added it), so read them again before choosing.
+      const want = handedOver()
+      if (want && !S.red.some(r => slugify(r) === slugify(want))) S.redFor = ''
+      else return waitingFor(S.red) && paint()
+    }
     S.redFor = key
+    S.redReady = ''
     S.red = []
     if (!t) return
     voice.redLinks(t.$page).then(red => {
@@ -1107,16 +1120,28 @@ function bindVoice($item, item) {
     })
   }
 
-  // The Plan Tool's Answer (wiki-plugin-plan) leaves a question in sessionStorage: if it is
-  // one of the red links, choose it as the page it is waiting for, as the select would; drop the key either way.
-  const waitingFor = red => {
-    let want = null
+  // The Plan Tool's Answer (wiki-plugin-plan) leaves a question in sessionStorage: choose it as
+  // the page it is waiting for, as the select would, and drop the key. The Plan Tool offers Answer
+  // only for a question with no page behind it, so the question is chosen even when the red links
+  // as read do not list it — it is added to the select — rather than lost under the default title.
+  const handedOver = () => {
     try {
-      want = sessionStorage.getItem('audionote.waitingFor')
+      return sessionStorage.getItem('audionote.waitingFor')
+    } catch {
+      return null
+    }
+  }
+  const waitingFor = red => {
+    const want = handedOver()
+    try {
       sessionStorage.removeItem('audionote.waitingFor')
     } catch {}
-    const hit = want && red.find(r => slugify(r) === slugify(want))
-    if (!hit) return false
+    if (!want) return false
+    let hit = red.find(r => slugify(r) === slugify(want))
+    if (!hit) {
+      hit = want.trim()
+      if (red === S.red) S.red = [...S.red, hit]
+    }
     switchTo(hit)
     persistSoon()
     return true
@@ -1186,6 +1211,12 @@ function bindVoice($item, item) {
     S.title = ui.title.value
     S.titleTouched = true
     persistSoon()
+  }
+  // Save page & link it is the default: Enter in the title presses it.
+  ui.title.onkeydown = e => {
+    if (e.key !== 'Enter' || e.isComposing) return
+    e.preventDefault()
+    if (!ui.add.disabled) ui.add.click()
   }
   ui.red.onchange = () => {
     if (!ui.red.value) return
