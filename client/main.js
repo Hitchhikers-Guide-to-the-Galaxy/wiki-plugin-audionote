@@ -1117,7 +1117,7 @@ function bindVoice($item, item) {
     } catch {}
     const hit = want && red.find(r => slugify(r) === slugify(want))
     if (!hit) return false
-    Object.assign(S, { title: hit, titleTouched: true })
+    switchTo(hit)
     persistSoon()
     return true
   }
@@ -1134,6 +1134,49 @@ function bindVoice($item, item) {
     ui.mic.style.display = 'none'
   }
 
+  // A draft belongs to the question it was spoken for. Choosing another
+  // question — the Plan Tool's Answer, or the red-link select — parks the
+  // recording, transcript and summary under the question they answer and
+  // picks up the new question's own draft, or starts clean. The current draft
+  // stays under item.id, so a reload still finds it.
+  const parkKey = title => `${item.id}|q:${slugify(title || '')}`
+  const park = draft => {
+    draft.parkedAs = { title: S.title, titleTouched: S.titleTouched }
+    voice.saveDraft(parkKey(S.title), { ...draft, title: S.title, titleTouched: S.titleTouched })
+  }
+  const switchTo = title => {
+    if (slugify(title) === slugify(S.title || '')) return Object.assign(S, { title, titleTouched: true })
+    if (S.draft) {
+      park(S.draft)
+      if (S.blobUrl) URL.revokeObjectURL(S.blobUrl)
+      ui.player.removeAttribute('src')
+      ui.preview.value = ''
+      Object.assign(S, { draft: null, blobUrl: null, $ghost: null })
+      working(null)
+      voice.clearDraft(item.id) // a reload must not bring the other question's words back
+    }
+    Object.assign(S, { title, titleTouched: true })
+    say(`ready for ${title} — speak, or drop a recording`)
+    voice.loadDraft(parkKey(title)).then(found => {
+      if (!found?.blob || S.draft || slugify(S.title) !== slugify(title)) return
+      const { title: _title, titleTouched: _touched, savedAt, parkedAs: _parked, ...draft } = found
+      S.draft = draft
+      voice.clearDraft(parkKey(title))
+      persist()
+      const when = new Date(savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      say(`picked up your recording for ${title} from ${when}${draft.transcript ? '' : ' — it has no transcript yet, press ↻ Transcribe'}`)
+      paint()
+    })
+    return true
+  }
+  // Work that lands after its draft was parked goes to the parked copy.
+  const landParked = draft => {
+    if (!draft.parkedAs) return
+    const { title, titleTouched } = draft.parkedAs
+    const { parkedAs: _parked, ...kept } = draft
+    voice.saveDraft(parkKey(title), { ...kept, title, titleTouched })
+  }
+
   let saveSoon = null
   const persistSoon = () => {
     clearTimeout(saveSoon)
@@ -1146,8 +1189,7 @@ function bindVoice($item, item) {
   }
   ui.red.onchange = () => {
     if (!ui.red.value) return
-    S.title = ui.red.value
-    S.titleTouched = true
+    switchTo(ui.red.value)
     persistSoon()
     paint()
   }
@@ -1172,7 +1214,14 @@ function bindVoice($item, item) {
     S.loaded = true
     voice.loadDraft(item.id).then(found => {
       if (!found?.blob || S.draft) return
-      const { title, titleTouched, savedAt, ...draft } = found
+      if (S.titleTouched && found.titleTouched && slugify(found.title) !== slugify(S.title)) {
+        // the Plan Tool handed over another question before the store answered
+        const { parkedAs: _parked, ...kept } = found
+        voice.saveDraft(parkKey(found.title), kept)
+        voice.clearDraft(item.id)
+        return switchTo(S.title)
+      }
+      const { title, titleTouched, savedAt, parkedAs: _parked, ...draft } = found
       S.draft = draft
       if (titleTouched) Object.assign(S, { title, titleTouched })
       const when = new Date(savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -1237,7 +1286,11 @@ function bindVoice($item, item) {
     } finally {
       if (S.draft === draft || !S.draft) working(null)
     }
-    if (S.draft !== draft) return // cleared, or replaced, while the farm worked
+    if (S.draft !== draft) {
+      // cleared, or replaced, while the farm worked; parked for another question, it keeps its words
+      draft.transcript = transcript
+      return landParked(draft)
+    }
     draft.transcript = transcript
     persist()
     ui.tbox.open = true
@@ -1319,8 +1372,9 @@ function bindVoice($item, item) {
       const out = await timed(ui.summarise.closest('.item'), () =>
         summaryFor({ transcript: draft.transcript.text, $page: t?.$page, prompt: p, title: S.title, model }),
       )
-      if (S.draft !== draft) return
-      draft.summary = { model: out.model, promptTitle: p?.title, promptFrom: p && !p.local ? p.from : '', section: p?.section || '' } // where the prompt was read from, to fork in on save
+      const summary = { model: out.model, promptTitle: p?.title, promptFrom: p && !p.local ? p.from : '', section: p?.section || '' } // where the prompt was read from, to fork in on save
+      if (S.draft !== draft) return draft.parkedAs && landParked(Object.assign(draft, { summary, summaryText: out.markdown }))
+      draft.summary = summary
       draft.summaryText = out.markdown
       ui.preview.value = out.markdown
       persist()
