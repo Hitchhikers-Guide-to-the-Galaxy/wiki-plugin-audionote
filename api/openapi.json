@@ -12,6 +12,7 @@
         "summary": "Transcribe a recording in this site's assets",
         "description": "Queues faster-whisper over assets/<slug>/<filename> and answers at once with a job to poll. Writes <name>.whisper.json and <name>.txt beside the recording.",
         "x-fedwiki-writes": true,
+        "x-fedwiki-spends": true,
         "x-fedwiki-context": [
           "origin",
           "status"
@@ -90,6 +91,7 @@
         "summary": "Summarise a transcript through a prompt (Claude or Ollama)",
         "description": "Fills the prompt's {{transcript}}, {{page_title}}, {{page_text}} and {{date}} and asks Claude. Spends money, so it is gated like a write.",
         "x-fedwiki-writes": true,
+        "x-fedwiki-spends": true,
         "x-fedwiki-context": [],
         "requestBody": {
           "required": true,
@@ -147,6 +149,7 @@
         "summary": "Transcribe a recording without keeping it",
         "description": "The request body is the recording itself. It is transcribed from the farm's temporary folder and then deleted — nothing is added to the site's assets. Answers at once with a job to poll; the finished job carries the text and segments, which engine heard it (macwhisper where the MacWhisper app is running on the farm's machine, else faster-whisper) and the machine's host name. To keep the audio, upload it separately through the Farm plugin's assets upload. Gated on the place alone: a private farm answers any caller, so a browser on a laptop can send a recording to the laptop's own farm — the local door — instead of the farm serving the page; it changes no page and keeps nothing.",
         "x-fedwiki-writes": true,
+        "x-fedwiki-spends": true,
         "x-fedwiki-context": [
           "origin"
         ],
