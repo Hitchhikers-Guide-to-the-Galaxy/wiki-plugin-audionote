@@ -22,7 +22,7 @@ export const randomId = () =>
 // ---------- which page, on which site ----------
 
 /** Tool pages to look past when finding the page being spoken to. */
-export const TOOL_SLUGS = new Set(['selected-plugin-pages', 'voice-tool', 'search-tool', 'like-this-page', 'plan-tool'])
+export const TOOL_SLUGS = new Set(['selected-plugin-pages', 'voice-tool', 'search-tool', 'like-this-page', 'plan-tool', 'model-settings', 'revise-plan'])
 
 const slugOf = $page => ($page.attr('id') || '').split('_rev')[0]
 

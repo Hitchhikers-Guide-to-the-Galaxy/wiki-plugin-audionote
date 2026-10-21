@@ -1059,6 +1059,7 @@ const voiceHtml = item => `
       <label><input type="checkbox" class="an-keep"> keep the audio in assets/</label><input type="text" class="an-folder" size="14" style="font-size:1em;" title="The assets folder the recording is stored in">
     </div>
     <div class="an-row an-saverow" style="display:none;">
+      <button class="an-back" style="display:none;" title="Send these words back to the Revise Plan page that asked for them, as the direction for the plan's redraft; nothing is saved here">↩ Use as the direction</button>
       <button class="an-add" disabled title="The default: save the notes as a new page of this title, and put a [[link]] to it on the page to the left (and on the clipboard). Enter in the question box presses it.">Save page &amp; link it</button>
       <button class="an-ghost" disabled title="Open the notes as a ghost page under this title — drag items from it, or save it">Open as ghost page</button>
       <button class="an-put" disabled title="Add the notes to the page on the left itself: under the prompt's SECTION heading when it names one (filling an unfilled card template there), otherwise before its See section">Add to this page</button>
@@ -1128,7 +1129,7 @@ function bindVoice($item, item) {
     keepbox: el('.an-keepbox'), keep: el('.an-keep'), folder: el('.an-folder'),
     titlebox: el('.an-titlebox'), title: el('.an-title'), red: el('.an-red'),
     levels: el('.an-levels'), busy: el('.an-busy'), meterline: el('.an-meterline'),
-    ghost: el('.an-ghost'), add: el('.an-add'), put: el('.an-put'), status: el('.an-status'),
+    ghost: el('.an-ghost'), add: el('.an-add'), put: el('.an-put'), back: el('.an-back'), status: el('.an-status'),
     cog: el('.an-cog'), settings: el('.an-settings'), steps: el('.an-steps'), next: el('.an-next'), words: el('.an-words'),
     sumrow: el('.an-sumrow'), saverow: el('.an-saverow'), tlabel: el('.an-tlabel'),
     type: el('.an-type'), typebox: el('.an-typebox'), typed: el('.an-typed'), typedDone: el('.an-typed-done'), typedCancel: el('.an-typed-cancel'), aswritten: el('.an-aswritten'),
@@ -1153,6 +1154,19 @@ function bindVoice($item, item) {
   const subject = () => {
     const t = resolveTarget(ui.$item, item)
     return t.source === 'subject' ? t : null
+  }
+
+  // A tool that asked for words back (wiki-plugin-plan 0.15.0's Revise Plan,
+  // "Direction for <Plan>") leaves where to send them under audionote.returnTo,
+  // beside the question it hands over. While that question is the one chosen,
+  // the words go back to it — ↩ Use as the direction — instead of to a page.
+  const returnTo = () => {
+    try {
+      const r = JSON.parse(sessionStorage.getItem('audionote.returnTo') || 'null')
+      return r && r.title && r.key && slugify(r.title) === slugify(S.title || '') ? r : null
+    } catch {
+      return null
+    }
   }
 
   // While the farm works, the line under the meter says so — with a running
@@ -1236,6 +1250,10 @@ function bindVoice($item, item) {
     if (!S.titleTouched) S.title = titlePattern.replace('{{page}}', t ? t.title : 'Voice').trim()
     if (document.activeElement !== ui.title) ui.title.value = S.title
     ui.ghost.disabled = ui.add.disabled = ui.put.disabled = !summarised || S.saving
+    const back = returnTo()
+    ui.back.style.display = back && summarised ? '' : 'none'
+    ui.back.textContent = back?.label || '↩ Use as the direction'
+    ui.back.disabled = !summarised || S.saving
 
     ui.red.style.display = S.red.length ? '' : 'none'
     const options = [`<option value="">● ${S.red.length} waiting…</option>`, ...S.red.map(r => `<option>${slugify(r) === slugify(S.title || '') ? '✓ ' : ''}${esc(r)}</option>`)].join('')
@@ -1261,7 +1279,7 @@ function bindVoice($item, item) {
     if (S.recording || !d) return 'speak'
     if (!d.transcript) return 'transcribe'
     if (d.summaryText === undefined) return 'summarise'
-    return d.savedAs ? 'done' : 'save'
+    return d.savedAs || d.sentBack ? 'done' : 'save'
   }
   const paintStage = () => {
     const d = S.draft
@@ -1271,15 +1289,16 @@ function bindVoice($item, item) {
       step.classList.toggle('done', stage === 'done' || i < at)
       step.classList.toggle('now', i === at)
     })
+    const back = returnTo()
     const primary =
       S.recording ? ui.stop
       : stage === 'speak' ? (canRecord ? ui.record : null)
       : stage === 'transcribe' ? (S.work ? null : ui.retry)
-      : stage === 'summarise' ? (S.summarising ? null : d.typed ? ui.aswritten : ui.summarise)
-      : stage === 'save' ? ui.add
+      : stage === 'summarise' ? (S.summarising ? null : d.typed || back ? ui.aswritten : ui.summarise)
+      : stage === 'save' ? (back ? ui.back : ui.add)
       : ui.clear
     const typingNow = !!S.typing
-    for (const b of [ui.record, ui.stop, ui.retry, ui.summarise, ui.aswritten, ui.add, ui.clear, ui.typedDone])
+    for (const b of [ui.record, ui.stop, ui.retry, ui.summarise, ui.aswritten, ui.add, ui.back, ui.clear, ui.typedDone])
       b.classList.toggle('an-primary', typingNow ? b === ui.typedDone : b === primary)
     ui.next.textContent =
       S.recording ? (S.paused ? 'Paused — ▶ Resume to carry on, or ■ Stop to finish' : 'Listening — ■ Stop when you have finished; ❚❚ Pause to think')
@@ -1288,9 +1307,11 @@ function bindVoice($item, item) {
       : stage === 'transcribe' ? (S.work ? 'Making the transcript — a moment…' : 'Next: ↻ Transcribe the recording')
       : stage === 'summarise'
         ? S.summarising ? 'Summarising — a moment…'
+        : back ? 'Next: ✓ Use as written — the model revising the plan reads your words as they are — or Summarise them first'
         : d.typed ? 'Next: ✓ Use as written — or choose a prompt and Summarise'
         : 'Next: choose a prompt and Summarise — or ✓ Use as written'
-      : stage === 'save' ? 'Next: read the notes, then Save page & link it'
+      : stage === 'save' ? (back ? `Next: read the words, then ${back.label || '↩ Use as the direction'} — they go to Revise Plan, beside ${back.plan || 'the plan'}` : 'Next: read the notes, then Save page & link it')
+      : d.sentBack ? `Sent to Revise Plan as the direction. Next: ✎ Revise there — or 🎙 Speak again to add more`
       : `Saved as “${d.savedAs}”. Next: ✕ Start over, or name another question and save again`
   }
 
@@ -1895,6 +1916,24 @@ function bindVoice($item, item) {
     if (S.draft?.summaryText === undefined) return
     const { title, kept } = await showGhost()
     say(`opened “${title}” — drag items from it, rename it on the page, or save it${kept || S.draft.typed ? '' : '; the recording was not kept'}`)
+    paint()
+  })
+
+  // Back to the tool that asked: the words, as they stand in the box, by an
+  // event the open Revise Plan page listens for, and in sessionStorage for one
+  // that renders later. Nothing is saved on the site.
+  ui.back.onclick = guard(async () => {
+    const r = returnTo()
+    if (!r || S.draft?.summaryText === undefined) return
+    const text = String(S.draft.summaryText || '').trim()
+    if (!text) throw new Error('there are no words to send')
+    try {
+      sessionStorage.setItem(r.key, text)
+    } catch {}
+    window.dispatchEvent(new CustomEvent(r.event || 'plan:direction', { detail: { slug: r.slug, site: r.site, title: r.title, text } }))
+    S.draft.sentBack = true
+    persist()
+    say(`sent to Revise Plan as the direction for ${r.plan || 'the plan'} — ${text.split(/\s+/).length} words`)
     paint()
   })
 
