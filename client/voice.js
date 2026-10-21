@@ -215,6 +215,119 @@ export function localDoor(text = '') {
 
 export const summarise = body => postJson('/system/api/audionote/summarise.json', body)
 
+/** Ask a model about the question being answered (0.9.0): {question, kind, ask, pageTitle, pageText, context, related, transcript, model}. */
+export const askAbout = body => postJson('/system/api/audionote/ask.json', body)
+
+// ---------- pages like the question (0.9.0) ----------
+//
+// The farm's own search (the Similarity plugin) finds pages that may already
+// answer the question, or explain its terms: by meaning first
+// (/system/search-report.json, every site this farm serves that the viewer may
+// see), and by keyword (/system/farm-search.json) when the embedder is down.
+// They are shown as links to open beside the tool, and the first few are read
+// and sent with a question to the model, so its answer leans on what the farm
+// already knows.
+
+const WORDS_NOT_SEARCHED = new Set(
+  'a about all also an and any are as at be by can could do does for from get has have how if in into is it its more much need no not of on one or our own should so than that the their them then there these they this to use was we what when where which who why will with would you your'.split(' '),
+)
+
+/** The question as search words: the stop words dropped, so a keyword search matches what matters. */
+export const searchWords = text =>
+  String(text || '')
+    .replace(/[^\p{L}\p{N}\s-]/gu, ' ')
+    .split(/\s+/)
+    .filter(w => w && !WORDS_NOT_SEARCHED.has(w.toLowerCase()))
+    .join(' ')
+
+async function searchByMeaning(query, limit) {
+  const res = await fetch('/system/search-report.json', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query, limit }),
+  })
+  if (!res.ok) throw await failure(res)
+  const page = await res.json()
+  return (page.story || [])
+    .filter(i => i.type === 'reference' && i.slug)
+    .map(i => ({ site: i.site || location.host, slug: i.slug, title: i.title || i.slug, synopsis: String(i.text || '').replace(/^#+\s.*\n+/, '').slice(0, 300) }))
+}
+
+async function searchByKeyword(query, limit) {
+  const q = searchWords(query) || String(query || '').trim()
+  const res = await fetch(`/system/farm-search.json?${new URLSearchParams({ q, format: 'flat', limit: String(limit) })}`)
+  if (!res.ok) throw await failure(res)
+  return ((await res.json()).results || []).map(r => ({ site: r.domain || r.site || '', slug: r.slug, title: r.title || r.slug, synopsis: r.synopsis || '' }))
+}
+
+/**
+ * Pages on this farm like `query`, best first: [{site, slug, title, synopsis}],
+ * with `.how` = 'meaning' or 'keyword'. `exclude` holds "site/slug" keys not to
+ * list (the page spoken to). A farm without the search says so.
+ */
+export async function similarPages(query, { exclude = [], limit = 8 } = {}) {
+  const q = String(query || '').trim()
+  if (!q) return []
+  const want = limit + exclude.length + 4
+  let found
+  let how = 'meaning'
+  try {
+    found = await searchByMeaning(q, want)
+  } catch {
+    how = 'keyword'
+    try {
+      found = await searchByKeyword(q, want)
+    } catch (e) {
+      throw new Error(/^404/.test(e.message) ? 'this farm has no search (the Similarity plugin is not installed)' : `the farm's search failed: ${e.message}`)
+    }
+  }
+  const skip = new Set(exclude)
+  const seen = new Set()
+  const out = []
+  for (const r of found) {
+    const key = `${r.site}/${r.slug}`
+    if (skip.has(key) || TOOL_SLUGS.has(r.slug) || seen.has(key)) continue
+    seen.add(key)
+    out.push(r)
+    if (out.length >= limit) break
+  }
+  return Object.assign(out, { how })
+}
+
+/** The words of the first `n` pages found, fetched from their sites, for a question's context. */
+export async function withText(pages, n = 4) {
+  const read = await Promise.all(
+    pages.slice(0, n).map(async p => {
+      // a site that does not answer in a few seconds costs its text, not the question
+      const page = await Promise.race([fetchPage(p.site === location.host ? '' : p.site, p.slug), new Promise(r => setTimeout(() => r(null), 5000))])
+      const text = page ? (page.story || []).map(i => (typeof i.text === 'string' ? i.text : '')).filter(Boolean).join('\n\n') : ''
+      return { ...p, text: text.slice(0, 8000) }
+    }),
+  )
+  return [...read, ...pages.slice(n)]
+}
+
+/**
+ * Where a question is asked on a page: every item that links to it, with the
+ * heading above each, so a model sees the line the question came from — a plan
+ * checkpoint, an open question's gloss — and not only its title.
+ */
+export function questionContext($page, title) {
+  const story = ($page?.data('data') || {}).story || []
+  const want = asSlug(title || '')
+  if (!want) return ''
+  const parts = []
+  let heading = ''
+  for (const item of story) {
+    const text = String(item.text || '')
+    const h = text.match(/^\s*#{1,6}\s+(.+)$/m)
+    if (item.type === 'markdown' && h && text.trim().startsWith('#')) heading = h[1].trim()
+    const links = [...text.matchAll(/\[\[([^\]]+)\]\]/g)].map(m => asSlug(m[1].trim()))
+    if (links.includes(want)) parts.push(`${heading ? `(under “${heading}”) ` : ''}${text.trim()}`)
+  }
+  return parts.join('\n\n')
+}
+
 // ---------- prompts ----------
 //
 // A prompt is a page whose first code item starts with a header, a line of
@@ -440,12 +553,13 @@ export async function addToPage($page, markdown, { section = '', fallbackAfter }
   const plan = section ? sectionPlan(story, section) : null
   if (plan?.replace) {
     await replaceText($page, plan.replace, String(markdown || '').trim())
-    return { how: 'replaced', count: 1 }
+    return { how: 'replaced', count: 1, last: plan.replace }
   }
   const blocks = splitMarkdown(markdown)
   let after = plan ? plan.after : fallbackAfter !== undefined ? fallbackAfter : insertionPoint($page)
   for (const text of blocks) after = await addItem($page, after, { type: 'markdown', id: randomId(), text })
-  return { how: plan ? 'section' : 'fallback', count: blocks.length }
+  // `last` is the item placed last, so whatever belongs with the notes (the kept audio) can follow it
+  return { how: plan ? 'section' : 'fallback', count: blocks.length, last: after }
 }
 
 /** Add one item after `afterId`, in the DOM and on the server. Returns its id. */
@@ -501,14 +615,22 @@ export function splitMarkdown(markdown) {
  * `kept` is { folder, src, transcriptTxt } once the audio has been uploaded.
  * Model page: chat.private.fish/are-embassies-only-in-the-uk-this-year.
  */
-export function spokenItems({ markdown, transcript, title, subjectTitle, promptTitle, kept }) {
+/**
+ * The player for a kept recording: an audio item at this site's absolute
+ * address (assets do not travel with a fork, so the link names this site),
+ * captioned with the question and the day it was recorded.
+ */
+export function keptAudioItem(kept, title = '') {
   const date = new Date().toISOString().slice(0, 10)
-  const origin = location.origin // assets do not travel with a fork, so links name this site
+  const caption = title ? `${/[.?!]$/.test(title) ? title : `${title}.`} Recorded ${date}.` : `Recorded ${date}.`
+  return { type: 'audio', id: randomId(), text: `${location.origin}/${kept.src}\n${caption}` }
+}
+
+export function spokenItems({ markdown, transcript, title, subjectTitle, promptTitle, kept }) {
   const item = (type, text, extra = {}) => ({ type, id: randomId(), text, ...extra })
   const items = splitMarkdown(markdown).map(t => item('markdown', t))
   if (kept) {
-    const caption = title ? `${/[.?!]$/.test(title) ? title : `${title}.`} Recorded ${date}.` : `Recorded ${date}.`
-    items.push(item('audio', `${origin}/${kept.src}\n${caption}`), item('markdown', '# Assets'), item('assets', kept.folder))
+    items.push(keptAudioItem(kept, title), item('markdown', '# Assets'), item('assets', kept.folder))
   } else if (transcript) {
     items.push(item('markdown', '# Transcript'), item('markdown', transcript.trim()))
   }

@@ -3,7 +3,7 @@
   "info": {
     "title": "Audio Note",
     "version": "0.3.0",
-    "description": "Speak to a wiki page. A recording already stored in the site's assets (through the Farm plugin's assets upload) is transcribed on this farm with faster-whisper, and the transcript can be summarised by Claude through a prompt \u2014 usually one drawn from a prompt wiki. The recorder and the Voice Tool page use these; so can an agent."
+    "description": "Speak to a wiki page. A recording already stored in the site's assets (through the Farm plugin's assets upload) is transcribed on this farm with faster-whisper, and the transcript can be summarised by Claude through a prompt — usually one drawn from a prompt wiki. The recorder and the Voice Tool page use these; so can an agent."
   },
   "paths": {
     "/transcribe.json": {
@@ -147,7 +147,7 @@
       "post": {
         "operationId": "hear",
         "summary": "Transcribe a recording without keeping it",
-        "description": "The request body is the recording itself. It is transcribed from the farm's temporary folder and then deleted \u2014 nothing is added to the site's assets. Answers at once with a job to poll; the finished job carries the text and segments, which engine heard it (macwhisper where the MacWhisper app is running on the farm's machine, else faster-whisper) and the machine's host name. To keep the audio, upload it separately through the Farm plugin's assets upload. Gated on the place alone: a private farm answers any caller, so a browser on a laptop can send a recording to the laptop's own farm \u2014 the local door \u2014 instead of the farm serving the page; it changes no page and keeps nothing.",
+        "description": "The request body is the recording itself. It is transcribed from the farm's temporary folder and then deleted — nothing is added to the site's assets. Answers at once with a job to poll; the finished job carries the text and segments, which engine heard it (macwhisper where the MacWhisper app is running on the farm's machine, else faster-whisper) and the machine's host name. To keep the audio, upload it separately through the Farm plugin's assets upload. Gated on the place alone: a private farm answers any caller, so a browser on a laptop can send a recording to the laptop's own farm — the local door — instead of the farm serving the page; it changes no page and keeps nothing.",
         "x-fedwiki-writes": true,
         "x-fedwiki-spends": true,
         "x-fedwiki-context": [
@@ -186,6 +186,82 @@
         },
         "x-fedwiki-gate": "place",
         "x-fedwiki-cross-origin": true
+      }
+    },
+    "/ask.json": {
+      "post": {
+        "operationId": "ask",
+        "summary": "Ask a model about the question being answered: tell me more, research it, or the author's own question",
+        "description": "Puts one question to a model with the question's context: the lines of the page where it is asked, the page's text, related pages the farm's search found (their text sent by the browser) and anything said so far. kind 'research' lets Claude read the web (WebSearch, WebFetch) when the farm reaches Claude by the CLI; other doors answer from the pages alone and the answer says web: false. Spends money, so it is gated like a write.",
+        "x-fedwiki-writes": true,
+        "x-fedwiki-spends": true,
+        "x-fedwiki-context": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "question"
+                ],
+                "properties": {
+                  "question": {
+                    "type": "string",
+                    "description": "The question being answered — the Voice Tool's page title, often a red link."
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "more",
+                      "research",
+                      "own"
+                    ],
+                    "description": "more = tell me more (default); research = research this question; own = the author's own question in `ask`."
+                  },
+                  "ask": {
+                    "type": "string",
+                    "description": "The author's own question, for kind own."
+                  },
+                  "pageTitle": {
+                    "type": "string"
+                  },
+                  "pageText": {
+                    "type": "string",
+                    "description": "The text of the page the question is asked on."
+                  },
+                  "context": {
+                    "type": "string",
+                    "description": "The items of that page that mention the question, with the heading above them."
+                  },
+                  "related": {
+                    "type": "array",
+                    "description": "Pages like the question, from the farm's search: {title, site, slug, synopsis, text}.",
+                    "items": {
+                      "type": "object"
+                    }
+                  },
+                  "transcript": {
+                    "type": "string",
+                    "description": "What has been said so far, when there is a transcript."
+                  },
+                  "model": {
+                    "type": "string",
+                    "description": "As for summarise: a model id, or auto."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "markdown, the model that wrote it, kind, web (whether the web was read), and for auto the pick."
+          },
+          "400": {
+            "description": "No question, or kind own with nothing typed."
+          }
+        }
       }
     }
   }

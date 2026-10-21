@@ -330,8 +330,8 @@ const SYSTEM =
 // One question, no tools, seven minutes at most: the door's defaults, with the
 // Voice Tool's own system prompt. The door's answer also carries ms, dropped
 // here so the summarise answer keeps its shape.
-const ask = async (model, content) => {
-  const { ms: _ms, ...out } = await (await doorReady()).ask(model, content, { system: SYSTEM, timeoutMs: 7 * 60 * 1000, allowTools: false })
+const askModel = async (model, content, { system = SYSTEM, timeoutMs = 7 * 60 * 1000, tools = null } = {}) => {
+  const { ms: _ms, ...out } = await (await doorReady()).ask(model, content, { system, timeoutMs, allowTools: false, tools })
   return out
 }
 
@@ -409,12 +409,98 @@ const summarise = async ({ transcript, pageTitle, pageText, title, prompt, model
   }
   const withPick = out => (picked ? { ...out, auto: picked } : out)
   try {
-    return withPick(await ask(door(chosen), content))
+    return withPick(await askModel(door(chosen), content))
   } catch (e) {
     if (!e.unreachable || !FALLBACK_MODEL || FALLBACK_MODEL === chosen) throw e
-    const out = await ask(FALLBACK_MODEL, content)
+    const out = await askModel(FALLBACK_MODEL, content)
     return withPick({ ...out, fellBackFrom: chosen, why: e.message })
   }
 }
 
-module.exports = { transcribe, hear, job, summarise, fill, door, engine, fromMacWhisper, macwhisperUp, voiceTier, autoPick, autoLine, AUTO_BIG_TOKENS, AUTO_ROOM }
+// ---------- asking about the question (0.9.0) ----------
+//
+// Before speaking, an author often needs to understand the question: wiki
+// questions are a line long and lean on terms the page around them assumes.
+// `ask` puts one question to a model — "tell me more", "research this", or the
+// author's own words — with the question's context: the lines of the page
+// where it is asked, the page itself, the pages the farm's search found like
+// it (the browser finds them and sends their text), and what has been said so
+// far. "research" lets Claude read the web (WebSearch, WebFetch) when the farm
+// reaches Claude by the CLI; other doors answer from the pages alone, and say so.
+
+const ASK_SYSTEM =
+  'You help an author on a federated wiki who has been set a question to answer, usually by speaking their answer. ' +
+  'Wiki questions are brief and often use terms, names and ideas the author may not know. Write plain markdown that reads well on a wiki page: ' +
+  'no preamble, no closing remarks, no hard line wraps inside paragraphs. Explain unfamiliar terms plainly. ' +
+  'Use the page the question is asked on and the related wiki pages you are given; when one helps, link it as [[Its Title]]. ' +
+  'Say plainly what you do not know or are unsure of, and never invent a source.'
+
+const ASK_KINDS = {
+  more:
+    'Tell me more about this question: what it is asking, what its terms and ideas mean, and why it matters on this page. ' +
+    'Keep it short — a few short paragraphs or bullets — and end with a line naming which related pages, if any, are worth reading first.',
+  research:
+    'Research this question for me. Set out what is known that would inform an answer: the main positions, facts, examples and sources, ' +
+    'and which of the related wiki pages already help. Do not write the answer for me; end with two or three points I might make in answering it.',
+}
+
+const clip = (text, n) => {
+  const t = String(text || '').trim()
+  return t.length > n ? `${t.slice(0, n)}\n…(cut)` : t
+}
+const attr = s => String(s || '').replace(/[<>"\n]/g, ' ').trim()
+
+/** The question and all its context as one message, in tagged parts a model reads easily. */
+const askContent = ({ question, kind, ask: own, pageTitle, pageText, context, related, transcript }) => {
+  const task = kind === 'own' ? String(own || '').trim() : ASK_KINDS[kind] || ASK_KINDS.more
+  const pages = (Array.isArray(related) ? related : []).slice(0, 8)
+  let room = 40000
+  const relatedText = pages
+    .map(p => {
+      const body = clip(p.text || p.synopsis || '', Math.min(8000, Math.max(0, room)))
+      room -= body.length
+      return `<wiki_page title="${attr(p.title)}" site="${attr(p.site)}">\n${body}\n</wiki_page>`
+    })
+    .join('\n')
+  return [
+    `<question>${String(question || '').trim()}</question>`,
+    context ? `<where_it_is_asked page="${attr(pageTitle)}">\n${clip(context, 4000)}\n</where_it_is_asked>` : '',
+    pageText ? `<page title="${attr(pageTitle)}">\n${clip(pageText, 60000)}\n</page>` : '',
+    relatedText ? `<related_pages>\n${relatedText}\n</related_pages>` : '',
+    transcript ? `<said_so_far>\n${clip(transcript, 20000)}\n</said_so_far>` : '',
+    `<request>${task}</request>`,
+  ]
+    .filter(Boolean)
+    .join('\n\n')
+}
+
+const ask = async (body, { doors = null } = {}) => {
+  const question = String(body?.question || '').trim()
+  if (!question) throw problem(400, 'there is no question to ask about')
+  const kind = ['more', 'research', 'own'].includes(body.kind) ? body.kind : 'more'
+  if (kind === 'own' && !String(body.ask || '').trim()) throw problem(400, 'type your question first')
+  const { MODEL_ID, defaultModel, fallbackModel, RESEARCH_TOOLS } = await doorReady()
+  const model = body.model
+  let chosen = model !== 'auto' && typeof model === 'string' && MODEL_ID.test(model) ? model : defaultModel('claude-opus-5')
+  const content = askContent({ ...body, question, kind })
+  let picked = null
+  if (model === 'auto') {
+    picked = await autoPick(content, { system: ASK_SYSTEM, doors })
+    chosen = picked.model
+  }
+  // Only the CLI road has tools; research elsewhere reads the pages alone.
+  const how = door(chosen)
+  const web = kind !== 'more' && how.startsWith('claude-cli:')
+  const opts = { system: ASK_SYSTEM, timeoutMs: (web ? 10 : 5) * 60 * 1000, tools: web ? RESEARCH_TOOLS : null }
+  const withPick = out => ({ ...out, web, kind, ...(picked ? { auto: picked } : {}) })
+  try {
+    return withPick(await askModel(how, content, opts))
+  } catch (e) {
+    const FALLBACK_MODEL = fallbackModel()
+    if (!e.unreachable || !FALLBACK_MODEL || FALLBACK_MODEL === chosen) throw e
+    const out = await askModel(FALLBACK_MODEL, content, { ...opts, tools: null })
+    return { ...withPick(out), web: false, fellBackFrom: chosen, why: e.message }
+  }
+}
+
+module.exports = { transcribe, hear, job, summarise, ask, askContent, ASK_KINDS, fill, door, engine, fromMacWhisper, macwhisperUp, voiceTier, autoPick, autoLine, AUTO_BIG_TOKENS, AUTO_ROOM }

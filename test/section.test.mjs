@@ -15,6 +15,7 @@ globalThis.$ = target => {
   return chain()
 }
 globalThis.document = {}
+globalThis.location ||= { origin: "http://demo.localhost", host: "demo.localhost" }
 globalThis.wiki = { doPlugin: () => {}, pageHandler: { put: (_p, a) => actions.push(a) } }
 
 const voice = await import('../client/voice.js')
@@ -71,7 +72,7 @@ test('an unfilled template is replaced; anything else is inserted after the sect
 test('addToPage: replace keeps the id as one edit', async () => {
   actions.length = 0
   const done = await addToPage(fakePage(card([md('t', TEMPLATE)])), '**What has to be done / description:**\n\nTest the beta.\n\n**Docs:**\n\nNone.', { section: 'Description' })
-  assert.deepEqual(done, { how: 'replaced', count: 1 })
+  assert.deepEqual(done, { how: 'replaced', count: 1, last: 't' })
   assert.equal(actions.length, 1)
   assert.equal(actions[0].type, 'edit')
   assert.equal(actions[0].id, 't')
@@ -81,14 +82,26 @@ test('addToPage: replace keeps the id as one edit', async () => {
 test('addToPage: a filled section gets adds after its last item', async () => {
   actions.length = 0
   const done = await addToPage(fakePage(card([md('t', 'Already written.')])), 'One.\n\nTwo.', { section: 'Description' })
-  assert.deepEqual(done, { how: 'section', count: 2 })
+  assert.deepEqual(done, { how: 'section', count: 2, last: actions[1].id })
   assert.deepEqual(actions.map(a => [a.type, a.after]), [['add', 't'], ['add', actions[0].id]])
+})
+
+test('Add to this page with the audio kept: the player follows the notes', async () => {
+  actions.length = 0
+  const $page = fakePage(card([md('t', 'Already written.')]))
+  const done = await addToPage($page, 'One.\n\nTwo.', { section: 'Description' })
+  const audio = voice.keptAudioItem({ src: 'assets/q/2026-10-21--voice.webm', folder: 'q' }, 'Does it work?')
+  await voice.addItem($page, done.last, audio)
+  const last = actions[actions.length - 1]
+  assert.equal(last.item.type, 'audio')
+  assert.equal(last.after, actions[1].id, 'straight after the last note')
+  assert.match(last.item.text, /^http:\/\/[^/]+\/assets\/q\/2026-10-21--voice\.webm\nDoes it work\? Recorded \d{4}-\d\d-\d\d\.$/)
 })
 
 test('addToPage: no SECTION, or no such heading, falls back to before See', async () => {
   actions.length = 0
   let done = await addToPage(fakePage(card([md('t', TEMPLATE)])), 'One.', {})
-  assert.deepEqual(done, { how: 'fallback', count: 1 })
+  assert.deepEqual({ ...done, last: undefined }, { how: 'fallback', count: 1, last: undefined })
   assert.equal(actions[0].after, 'c')
   actions.length = 0
   done = await addToPage(fakePage(card([md('t', TEMPLATE)])), 'One.', { section: 'Offer' })

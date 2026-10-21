@@ -929,65 +929,176 @@ const summaryFor = ({ transcript, $page, prompt, title = '', model = '' }) =>
 
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
 
+// The Voice Tool's look, once per document: classes rather than inline styles,
+// so the next step's button can be marked by a class as the stage moves on.
+const VOICE_CSS = `
+.an-voice { background:#eee; padding:8px 10px; border-radius:6px; }
+.an-voice button { font-size:.88em; padding:1px 7px; }
+.an-voice .an-primary { font-weight:bold; background:#2f6fcf; color:#fff; border:1px solid #2559a8; border-radius:4px; }
+.an-voice .an-primary:disabled { opacity:.45; }
+.an-voice .an-row { display:flex; align-items:center; gap:4px; flex-wrap:wrap; margin-top:5px; font-size:.9em; }
+.an-voice .an-head { display:flex; align-items:center; gap:5px; }
+.an-voice .an-dest { flex:1; min-width:0; font-size:.9em; padding:2px 7px; border:2px solid #9ab; border-radius:5px; background:#eef4ff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.an-voice .an-cog { font-size:1.05em; padding:0 6px; line-height:1.5; }
+.an-voice .an-cog.on { background:#555; color:#fff; }
+.an-voice .an-settings { margin-top:5px; padding:5px 7px; border:1px solid #ccc; border-radius:4px; background:#f7f7f7; font-size:.85em; }
+.an-voice .an-settings > div + div { margin-top:4px; }
+.an-voice .an-steps { display:flex; gap:3px; margin-top:6px; font-size:.78em; }
+.an-voice .an-step { flex:1; text-align:center; padding:2px 0; border-radius:3px; background:#dcdcdc; color:#777; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.an-voice .an-step.done { background:#d4ecd9; color:#1a7f37; }
+.an-voice .an-step.now { background:#2f6fcf; color:#fff; font-weight:bold; }
+.an-voice .an-next { font-size:.82em; color:#2559a8; margin-top:3px; }
+.an-voice details { margin-top:5px; }
+.an-voice details > summary { cursor:pointer; font-size:.88em; }
+.an-voice .an-box { font-size:.85em; background:#fff; padding:5px 8px; border-radius:4px; max-height:12em; overflow:auto; }
+.an-voice .an-box p { margin:.3em 0; }
+.an-voice .an-box ul { margin:.3em 0; padding-left:1.3em; }
+.an-voice .an-ask { border:1px solid #c9d6ea; border-radius:4px; background:#f3f7fd; padding:3px 7px; }
+.an-voice .an-similar { font-size:.83em; margin-top:5px; max-height:8.5em; overflow:auto; }
+.an-voice .an-similar div { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.an-voice .an-similar .site { color:#888; font-size:.9em; }
+.an-voice .an-took:empty, .an-voice .an-ask-status:empty { display:none; }
+.an-voice .an-big { flex:1; font-size:1em; padding:5px 12px; border-radius:6px; border:1px solid #2559a8; }
+.an-voice .an-big.an-primary { background:linear-gradient(#3a7ce0, #2a63bd); box-shadow:0 1px 2px rgba(0,0,0,.25); }
+.an-voice .an-type.an-big { flex:0 0 auto; background:#fff; color:#2559a8; font-weight:normal; }
+.an-voice .an-typebox textarea { width:100%; box-sizing:border-box; font-size:.88em; height:7em; resize:vertical; }
+.an-voice .an-foot { margin-top:6px; padding-top:4px; border-top:1px solid #ddd; font-size:.8em; color:#666; }
+`
+const voiceStyle = () => {
+  if (document.getElementById('an-voice-css')) return
+  const style = document.createElement('style')
+  style.id = 'an-voice-css'
+  style.textContent = VOICE_CSS
+  document.head.appendChild(style)
+}
+
+// The model choice alone, for the Voice Tool's settings; the transcript item keeps modelRowHtml.
+const modelSelectHtml = () =>
+  `Model <select class="an-model" style="max-width:75%;">${MODELS.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join('')}</select>`
+
+// The stages a recording goes through, in order, and what to do at each.
+const STEPS = [
+  ['speak', '① Speak or type'],
+  ['transcribe', '② Transcript'],
+  ['summarise', '③ Summarise'],
+  ['save', '④ Save'],
+]
+
 const voiceHtml = item => `
-  <div class="an-voice" style="background-color:#eee; padding:12px; border-radius:6px;">
-    <div class="an-dest" style="font-size:.95em; margin:0 0 8px; padding:6px 9px; border:2px solid #9ab; border-radius:5px; background:#eef4ff;">
-      <strong>Speaking to ▸</strong> <span class="an-target">looking to the left…</span>
+  <div class="an-voice">
+    <div class="an-head">
+      <div class="an-dest"><strong>Speaking to ▸</strong> <span class="an-target">looking to the left…</span></div>
+      <button class="an-cog" title="Settings: microphone, boost and the model that writes">⚙</button>
     </div>
-    <div class="an-warn" style="display:none; color:#c0392b; font-size:.9em; margin:0 0 8px;"></div>
-    <div class="an-titlebox" style="margin:0 0 8px; font-size:.85em; white-space:nowrap;">
-      Page title <input type="text" class="an-title" style="width:68%; font-size:1em;"
-        title="The name of the notes page. Change it for each question to build a series — it can also be edited on the ghost page itself.">
-      <div class="an-redbox" style="margin-top:4px; display:none;">
-        <span style="color:#c0392b;">●</span> or a page it is waiting for
-        <select class="an-red" style="max-width:62%; font-size:1em;" title="Red links on the page to the left: pages it links to that nobody has written yet. Saving under one turns the link blue."></select>
+    <div class="an-settings" style="display:none;">
+      <div>Microphone <select class="an-mic" style="max-width:75%;"></select></div>
+      <div style="white-space:nowrap;">Boost <input type="range" class="an-gain" min="0" max="24" step="1" value="0" style="width:110px; vertical-align:middle;">
+        +<span class="an-gaindb" style="display:inline-block; min-width:1.4em;">0</span>&nbsp;dB</div>
+      <div>${modelSelectHtml()}</div>
+    </div>
+    <div class="an-warn" style="display:none; color:#c0392b; font-size:.9em; margin-top:5px;"></div>
+    <div class="an-row an-titlebox">
+      <span title="The question being answered — it becomes the title of the notes page">Question</span>
+      <input type="text" class="an-title" style="flex:1; min-width:9em; font-size:1em;"
+        title="The question, and the title of the notes page. Change it for each question to build a series; Enter saves once there are notes.">
+      <select class="an-red" style="max-width:8em; font-size:.95em; display:none;" title="Red links on the page to the left: questions it links to that nobody has answered yet. Saving under one turns the link blue."></select>
+    </div>
+    <details class="an-ask">
+      <summary>💬 Ask about this question <span class="an-ask-note" style="color:#666;"></span></summary>
+      <div class="an-row">
+        <button class="an-ask-more" title="What the question asks, what its terms mean, and why it matters on this page">Tell me more</button>
+        <button class="an-ask-research" title="What is known that would inform an answer — with web search when the farm reaches Claude">Research this</button>
+        <button class="an-ask-similar" title="Pages on this farm like the question: they may already answer it">⌕ Similar pages</button>
       </div>
+      <textarea class="an-ask-own" rows="2" placeholder="Or ask your own question — the question, its page and similar pages go with it (⌘↵ asks)"
+        style="width:100%; box-sizing:border-box; margin-top:5px; font-size:.85em; height:3.2em; min-height:2.4em; resize:vertical;"></textarea>
+      <div class="an-row" style="margin-top:2px;">
+        <button class="an-ask-go">Ask</button>
+        <span class="an-ask-status" style="font-size:.85em; color:#555;"></span>
+      </div>
+      <div class="an-similar"></div>
+      <div class="an-box an-ask-answer" style="display:none; margin-top:5px; max-height:16em;"></div>
+      <div class="an-row an-ask-actions" style="display:none;">
+        <button class="an-ask-ghost" title="Open the answer as a ghost page beside the tool — drag from it, or save it">Open as ghost page</button>
+        <button class="an-ask-copy">Copy</button>
+        <button class="an-ask-clear" title="Forget this answer">✕</button>
+      </div>
+    </details>
+    <div class="an-steps">${STEPS.map(([k, l]) => `<span class="an-step" data-step="${k}">${l}</span>`).join('')}</div>
+    <div class="an-next"></div>
+    <div class="an-row an-typebox" style="display:none;">
+      <textarea class="an-typed" placeholder="Type your answer to the question. Then Use this text: Summarise it, or use it as written."></textarea>
+      <button class="an-typed-done" title="Take this text as the answer — the next step is to summarise it, or use it as written">Use this text</button>
+      <button class="an-typed-cancel">Cancel</button>
     </div>
-    <select class="an-mic" style="width:100%; font-size:.85em; margin-bottom:6px;"></select>
-    <div>
-      <button class="an-record">● Speak</button>
-      <button class="an-pause" disabled>❚❚ Pause</button>
-      <button class="an-stop" disabled>■ Stop</button>
-      <button class="an-clear" disabled title="Throw away this recording, its transcript and summary, and start again">✕ Start over</button>
+    <div class="an-row">
+      <button class="an-record">🎙 Speak</button>
+      <button class="an-type" title="Type the answer instead — where speaking is not appropriate">✎ Type instead</button>
+      <button class="an-pause" style="display:none;">❚❚ Pause</button>
+      <button class="an-stop" style="display:none;">■ Stop</button>
       <button class="an-retry" style="display:none;" title="Transcribe this recording again — its transcript was not kept, or the farm refused it">↻ Transcribe</button>
+      <button class="an-clear" style="display:none;" title="Throw away this recording, its transcript and summary, and start again">✕ Start over</button>
     </div>
-    <div style="font-size:.8em; color:#444; margin:6px 0 4px; white-space:nowrap;">
-      boost <input type="range" class="an-gain" min="0" max="24" step="1" value="0" style="width:110px; vertical-align:middle;">
-      +<span class="an-gaindb" style="display:inline-block; min-width:1.4em;">0</span>&nbsp;dB
+    <canvas class="an-meter" width="400" height="28" style="width:100%; background:#111; border-radius:4px; margin-top:5px; display:none;"></canvas>
+    <div class="an-meterline" style="display:none;">${meterLine}</div>
+    <audio class="an-player" controls style="width:100%; height:32px; margin-top:5px; display:none;"></audio>
+    <details class="an-tbox" style="display:none;">
+      <summary><span class="an-tlabel">Transcript</span> <span class="an-words" style="color:#666;"></span></summary>
+      <div class="an-box an-transcript"></div>
+    </details>
+    <div class="an-row an-sumrow" style="display:none; flex-wrap:nowrap;">
+      Prompt <select class="an-prompt" style="flex:1; min-width:0;"><option>finding prompts…</option></select>
+      <button class="an-summarise" disabled>Summarise</button>
+      <button class="an-aswritten" title="Use the words as they are, without a model: they become the notes, ready to edit and save">✓ Use as written</button>
     </div>
-    <canvas class="an-meter" width="400" height="36" style="width:100%; background:#111; border-radius:4px;"></canvas>
-    ${meterLine}
-    <div style="font-size:.85em;">
-      <label class="an-pick" style="cursor:pointer; border:1px solid #999; border-radius:3px; padding:1px 6px; background:#fafafa;"
+    <div class="an-took" style="font-size:.8em; color:#666; margin-top:2px;" title="how long the last summary took, from this browser"></div>
+    <textarea class="an-preview" rows="6" placeholder="The summary appears here to read and edit."
+      style="width:100%; box-sizing:border-box; margin-top:5px; font-size:.85em; height:9em; resize:vertical; display:none;"></textarea>
+    <div class="an-keepbox" style="margin-top:3px; font-size:.82em; display:none;"
+      title="Unticked, the recording is thrown away and only the text remains.">
+      <label><input type="checkbox" class="an-keep"> keep the audio in assets/</label><input type="text" class="an-folder" size="14" style="font-size:1em;" title="The assets folder the recording is stored in">
+    </div>
+    <div class="an-row an-saverow" style="display:none;">
+      <button class="an-add" disabled title="The default: save the notes as a new page of this title, and put a [[link]] to it on the page to the left (and on the clipboard). Enter in the question box presses it.">Save page &amp; link it</button>
+      <button class="an-ghost" disabled title="Open the notes as a ghost page under this title — drag items from it, or save it">Open as ghost page</button>
+      <button class="an-put" disabled title="Add the notes to the page on the left itself: under the prompt's SECTION heading when it names one (filling an unfilled card template there), otherwise before its See section">Add to this page</button>
+    </div>
+    <div class="an-status" style="font-size:.8em; color:#555; margin-top:4px; min-height:1.2em;"></div>
+    <div class="an-foot">
+      <label class="an-pick" style="cursor:pointer; border:1px solid #aaa; border-radius:3px; padding:0 5px; background:#fafafa;"
         title="Record with the phone's own recorder, or choose a recording — works where the browser may not use the microphone (plain http)">
         🎙 record or choose a file<input type="file" class="an-file" accept="audio/*,video/*" capture style="display:none;"></label>
-      <span style="color:#666;">&nbsp;or drop one here</span>
+      or drop one on the tool
     </div>
-    <audio class="an-player" controls style="width:100%; margin-top:6px; display:none;"></audio>
-    <details class="an-tbox" style="margin-top:6px; display:none;">
-      <summary style="cursor:pointer; font-size:.9em;">Transcript</summary>
-      <div class="an-transcript" style="font-size:.85em; background:#fff; padding:6px 8px; border-radius:4px; max-height:12em; overflow:auto;"></div>
-    </details>
-    <div style="margin-top:8px; font-size:.9em; white-space:nowrap; overflow:hidden;">
-      Prompt <select class="an-prompt" style="max-width:62%;"><option>finding prompts…</option></select>
-      <button class="an-summarise" disabled>Summarise</button>
-    </div>
-    ${modelRowHtml()}
-    <textarea class="an-preview" rows="9" placeholder="The summary appears here to read and edit."
-      style="width:100%; box-sizing:border-box; margin-top:6px; font-size:.85em; display:none;"></textarea>
-    <div class="an-keepbox" style="margin-top:6px; font-size:.85em; display:none;">
-      <label><input type="checkbox" class="an-keep"> keep the audio — upload it to assets/</label><input type="text" class="an-folder" size="16" style="font-size:1em;" title="The assets folder the recording is stored in">
-      <div style="color:#666;">Unticked, the recording is thrown away and only the text remains.</div>
-    </div>
-    <div style="margin-top:6px;">
-      <button class="an-put" disabled title="Add the notes to the page on the left itself: under the prompt's SECTION heading when it names one (filling an unfilled card template there), otherwise before its See section">Add to this page</button>
-      <button class="an-ghost" disabled title="Open the notes as a ghost page under this title — drag items from it, or save it">Open as ghost page</button>
-      <button class="an-add" disabled style="${PRIMARY}" title="The default: save the notes as a new page of this title, and put a [[link]] to it on the page to the left (and on the clipboard). Enter in the page title presses it.">Save page &amp; link it</button>
-    </div>
-    <div class="an-status" style="font-size:.8em; color:#555; margin-top:4px; min-height:1.3em;">speak, or drop a recording</div>
-    <p class="an-caption" style="font-style:italic; margin:6px 0 0;">${wiki.resolveLinks(itemCaption(item.text) || '')}</p>
+    <p class="an-caption" style="font-style:italic; margin:4px 0 0;">${wiki.resolveLinks(itemCaption(item.text) || '')}</p>
   </div>
 `
+
+/** A model's markdown answer as HTML for the tool: paragraphs, bullets, headings, bold, and links resolved by the wiki. */
+const answerHtml = markdown => {
+  const inline = t =>
+    wiki
+      .resolveLinks(t)
+      .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
+      .replace(/(^|[^*\w])\*([^*\s][^*]*)\*/g, '$1<i>$2</i>')
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+  const bullet = /^\s*(?:[-*+]|\d+[.)])\s+/
+  return String(markdown || '')
+    .trim()
+    .split(/\n\s*\n/)
+    .map(chunk => {
+      const lines = chunk.split('\n').filter(l => l.trim())
+      const h = chunk.trim().match(/^#{1,6}\s+(.*)$/)
+      if (h && lines.length === 1) return `<p><b>${inline(h[1])}</b></p>`
+      if (lines.length && bullet.test(lines[0])) {
+        const items = []
+        for (const l of lines) bullet.test(l) && !/^\s{2,}/.test(l) ? items.push(l.replace(bullet, '')) : items.length ? (items[items.length - 1] += ` ${l.trim().replace(bullet, '— ')}`) : items.push(l)
+        return `<ul>${items.map(i => `<li>${inline(i)}</li>`).join('')}</ul>`
+      }
+      return `<p>${lines.map(inline).join('<br>')}</p>`
+    })
+    .join('')
+}
 
 // A Voice Tool's state lives HERE, not in the item that draws it. The lineup
 // closes the tool whenever a link is followed from the page on its left, and an
@@ -1015,12 +1126,20 @@ function bindVoice($item, item) {
     player: el('.an-player'), tbox: el('.an-tbox'), transcript: el('.an-transcript'),
     prompt: el('.an-prompt'), summarise: el('.an-summarise'), preview: el('.an-preview'),
     keepbox: el('.an-keepbox'), keep: el('.an-keep'), folder: el('.an-folder'),
-    titlebox: el('.an-titlebox'), title: el('.an-title'), redbox: el('.an-redbox'), red: el('.an-red'),
-    levels: el('.an-levels'), busy: el('.an-busy'),
+    titlebox: el('.an-titlebox'), title: el('.an-title'), red: el('.an-red'),
+    levels: el('.an-levels'), busy: el('.an-busy'), meterline: el('.an-meterline'),
     ghost: el('.an-ghost'), add: el('.an-add'), put: el('.an-put'), status: el('.an-status'),
+    cog: el('.an-cog'), settings: el('.an-settings'), steps: el('.an-steps'), next: el('.an-next'), words: el('.an-words'),
+    sumrow: el('.an-sumrow'), saverow: el('.an-saverow'), tlabel: el('.an-tlabel'),
+    type: el('.an-type'), typebox: el('.an-typebox'), typed: el('.an-typed'), typedDone: el('.an-typed-done'), typedCancel: el('.an-typed-cancel'), aswritten: el('.an-aswritten'),
+    ask: el('.an-ask'), askNote: el('.an-ask-note'), askMore: el('.an-ask-more'), askResearch: el('.an-ask-research'),
+    askSimilar: el('.an-ask-similar'), askOwn: el('.an-ask-own'), askGo: el('.an-ask-go'), askStatus: el('.an-ask-status'),
+    similar: el('.an-similar'), answer: el('.an-ask-answer'), askActions: el('.an-ask-actions'),
+    askGhost: el('.an-ask-ghost'), askCopy: el('.an-ask-copy'), askClear: el('.an-ask-clear'),
     $item,
   }
-  bindModel($item[0]) // the summary model choice, remembered in this browser
+  voiceStyle()
+  const chosenModel = bindModel($item[0]) // the model choice, in the settings, remembered in this browser
   // Every reach for the page goes through the session, so work begun by an
   // earlier bind — a take, a transcription, a summary — finishes on the item
   // that is on screen now. What the recorder sets (stopFn, pauseFn) is kept on
@@ -1047,6 +1166,9 @@ function bindVoice($item, item) {
   }
   const paintWork = () => {
     const busy = !!S.work && !S.recording
+    // The meter and its line only while there is something to show: a take, or the farm at work.
+    ui.meter.style.display = S.recording ? '' : 'none'
+    ui.meterline.style.display = S.recording || busy ? '' : 'none'
     ui.levels.style.display = busy ? 'none' : ''
     ui.busy.style.display = busy ? '' : 'none'
     if (busy) ui.busy.textContent = `⏳ ${S.work.what}… ${Math.round((Date.now() - S.work.since) / 1000)}s`
@@ -1067,12 +1189,24 @@ function bindVoice($item, item) {
     ui.dest.style.borderColor = t && !why ? '#1a7f37' : '#9ab'
     ui.dest.style.background = t && !why ? '#eef9f0' : '#eef4ff'
 
+    // Only the buttons that mean something now: Pause and Stop while speaking,
+    // Start over once there is something to start over from.
     ui.record.disabled = S.recording || !canRecord
-    ui.stop.disabled = ui.pause.disabled = !S.recording
+    ui.stop.style.display = ui.pause.style.display = S.recording ? '' : 'none'
     ui.pause.textContent = S.paused ? '▶ Resume' : '❚❚ Pause'
+    ui.record.textContent = S.recording ? (S.paused ? '● paused' : '● listening…') : d ? '🎙 Speak again' : '🎙 Speak your answer'
+    // Before anything is said, Speak and Type are the two big ways in; after, they step back.
+    const opening = !d && !S.recording && !S.typing
+    ui.record.classList.toggle('an-big', opening || S.recording)
+    ui.type.classList.toggle('an-big', opening)
+    ui.type.style.display = S.recording || S.typing ? 'none' : ''
+    ui.type.textContent = d ? '✎ Type again' : '✎ Type instead'
+    ui.typebox.style.display = S.typing ? 'flex' : 'none'
+    ui.record.style.display = S.typing ? 'none' : ''
+    if (S.typing && document.activeElement !== ui.typed && ui.typed.value !== (S.typedText || '')) ui.typed.value = S.typedText || ''
     ui.record.style.background = S.recording ? (S.paused ? '#d68910' : '#c0392b') : ''
     ui.record.style.color = S.recording ? 'white' : ''
-    ui.clear.disabled = !d
+    ui.clear.style.display = d && !S.recording ? '' : 'none'
     // A recording the farm has not heard — refused, dropped, or restored without its text — can be sent again.
     ui.retry.style.display = d?.blob && !d?.transcript && !S.work && !S.recording ? '' : 'none'
 
@@ -1080,14 +1214,20 @@ function bindVoice($item, item) {
       S.blobUrl ||= URL.createObjectURL(d.blob)
       if (ui.player.getAttribute('src') !== S.blobUrl) ui.player.src = S.blobUrl
     }
-    ui.player.style.display = d?.blob ? '' : 'none'
+    ui.player.style.display = d?.blob && !S.recording ? '' : 'none'
+    // The transcript arrives folded: the summary is what is read, the transcript is there to check.
     ui.tbox.style.display = d?.transcript ? '' : 'none'
-    ui.transcript.textContent = d?.transcript ? d.transcript.text || '(nothing was heard)' : ''
-    ui.summarise.disabled = !d?.transcript?.text || S.summarising
+    const heard = d?.transcript ? d.transcript.text || '' : ''
+    ui.transcript.textContent = d?.transcript ? heard || '(nothing was heard)' : ''
+    ui.words.textContent = heard ? `· ${heard.split(/\s+/).filter(Boolean).length} words` : ''
+    ui.tlabel.textContent = d?.typed ? 'What you typed' : 'Transcript'
+    ui.sumrow.style.display = d?.transcript ? 'flex' : 'none'
+    ui.summarise.disabled = !heard || S.summarising
     const summarised = d?.summaryText !== undefined
-    // The title — and the red links to choose it from — are there from the start:
-    // choosing the question first, then speaking to it, is the natural order.
-    ui.preview.style.display = ui.keepbox.style.display = summarised ? '' : 'none'
+    ui.preview.style.display = summarised ? '' : 'none'
+    ui.keepbox.style.display = summarised && d?.blob ? '' : 'none' // typed words have no audio to keep
+    ui.aswritten.disabled = !heard || S.summarising
+    ui.saverow.style.display = summarised ? 'flex' : 'none'
     if (summarised && document.activeElement !== ui.preview && ui.preview.value !== d.summaryText) ui.preview.value = d.summaryText
     ui.keep.checked = !!d?.keep
     ui.keep.disabled = !!d?.kept
@@ -1096,16 +1236,62 @@ function bindVoice($item, item) {
     if (!S.titleTouched) S.title = titlePattern.replace('{{page}}', t ? t.title : 'Voice').trim()
     if (document.activeElement !== ui.title) ui.title.value = S.title
     ui.ghost.disabled = ui.add.disabled = ui.put.disabled = !summarised || S.saving
-    ui.add.style.opacity = ui.add.disabled ? '.45' : '1'
 
-    ui.redbox.style.display = S.red.length ? '' : 'none'
-    const options = ['<option value="">choose…</option>', ...S.red.map(r => `<option${r === S.title ? ' selected' : ''}>${esc(r)}</option>`)].join('')
+    ui.red.style.display = S.red.length ? '' : 'none'
+    const options = [`<option value="">● ${S.red.length} waiting…</option>`, ...S.red.map(r => `<option>${slugify(r) === slugify(S.title || '') ? '✓ ' : ''}${esc(r)}</option>`)].join('')
     if (ui.red.dataset.for !== options) {
       ui.red.innerHTML = options
       ui.red.dataset.for = options
     }
+    if (document.activeElement !== ui.red) ui.red.value = ''
+    paintStage()
+    paintSettings()
+    paintAsk()
     if (S.status) ui.status.textContent = S.status
     findRed(t)
+  }
+
+  // ---- where we are, and the one thing to do next ----
+  // The stage is read from the draft: no recording → speak; a recording the
+  // farm has not heard → transcript; a transcript → summarise; a summary →
+  // save; saved → done. The next step's button is the blue one, and the line
+  // beneath the stage bar says it in words.
+  const stageOf = () => {
+    const d = S.draft
+    if (S.recording || !d) return 'speak'
+    if (!d.transcript) return 'transcribe'
+    if (d.summaryText === undefined) return 'summarise'
+    return d.savedAs ? 'done' : 'save'
+  }
+  const paintStage = () => {
+    const d = S.draft
+    const stage = stageOf()
+    const at = STEPS.findIndex(([k]) => k === stage)
+    ui.steps.querySelectorAll('.an-step').forEach((step, i) => {
+      step.classList.toggle('done', stage === 'done' || i < at)
+      step.classList.toggle('now', i === at)
+    })
+    const primary =
+      S.recording ? ui.stop
+      : stage === 'speak' ? (canRecord ? ui.record : null)
+      : stage === 'transcribe' ? (S.work ? null : ui.retry)
+      : stage === 'summarise' ? (S.summarising ? null : d.typed ? ui.aswritten : ui.summarise)
+      : stage === 'save' ? ui.add
+      : ui.clear
+    const typingNow = !!S.typing
+    for (const b of [ui.record, ui.stop, ui.retry, ui.summarise, ui.aswritten, ui.add, ui.clear, ui.typedDone])
+      b.classList.toggle('an-primary', typingNow ? b === ui.typedDone : b === primary)
+    ui.next.textContent =
+      S.recording ? (S.paused ? 'Paused — ▶ Resume to carry on, or ■ Stop to finish' : 'Listening — ■ Stop when you have finished; ❚❚ Pause to think')
+      : S.typing ? 'Type your answer, then Use this text'
+      : stage === 'speak' ? (canRecord ? 'Next: speak or type your answer — or 💬 ask about the question first' : 'Next: ✎ type your answer, or 🎙 record or choose a file below — this browser cannot use the microphone here')
+      : stage === 'transcribe' ? (S.work ? 'Making the transcript — a moment…' : 'Next: ↻ Transcribe the recording')
+      : stage === 'summarise'
+        ? S.summarising ? 'Summarising — a moment…'
+        : d.typed ? 'Next: ✓ Use as written — or choose a prompt and Summarise'
+        : 'Next: choose a prompt and Summarise — or ✓ Use as written'
+      : stage === 'save' ? 'Next: read the notes, then Save page & link it'
+      : `Saved as “${d.savedAs}”. Next: ✕ Start over, or name another question and save again`
   }
 
   // The subject's red links, looked up once per subject (and again after a save).
@@ -1169,7 +1355,7 @@ function bindVoice($item, item) {
   }
   if (!canRecord) {
     ui.record.title = 'the browser allows the microphone only over https — use "record or choose a file"'
-    ui.mic.style.display = 'none'
+    ui.mic.parentNode.style.display = 'none'
   }
 
   // A draft belongs to the question it was spoken for. Choosing another
@@ -1196,13 +1382,13 @@ function bindVoice($item, item) {
     Object.assign(S, { title, titleTouched: true })
     say(`ready for ${title} — speak, or drop a recording`)
     voice.loadDraft(parkKey(title)).then(found => {
-      if (!found?.blob || S.draft || slugify(S.title) !== slugify(title)) return
+      if (!(found?.blob || found?.transcript) || S.draft || slugify(S.title) !== slugify(title)) return
       const { title: _title, titleTouched: _touched, savedAt, parkedAs: _parked, ...draft } = found
       S.draft = draft
       voice.clearDraft(parkKey(title))
       persist()
       const when = new Date(savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      say(`picked up your recording for ${title} from ${when}${draft.transcript ? '' : ' — it has no transcript yet, press ↻ Transcribe'}`)
+      say(`picked up your ${draft.typed ? 'typed answer' : 'recording'} for ${title} from ${when}${draft.transcript ? '' : ' — it has no transcript yet, press ↻ Transcribe'}`)
       paint()
     })
     return true
@@ -1224,6 +1410,7 @@ function bindVoice($item, item) {
     S.title = ui.title.value
     S.titleTouched = true
     persistSoon()
+    paintAsk() // the Ask panel follows the question
   }
   // Save page & link it is the default: Enter in the title presses it.
   ui.title.onkeydown = e => {
@@ -1233,7 +1420,8 @@ function bindVoice($item, item) {
   }
   ui.red.onchange = () => {
     if (!ui.red.value) return
-    switchTo(ui.red.value)
+    switchTo(ui.red.value.replace(/^✓ /, ''))
+    ui.red.value = ''
     persistSoon()
     paint()
   }
@@ -1250,6 +1438,202 @@ function bindVoice($item, item) {
     persistSoon()
   }
 
+  // ---- settings: the microphone, its boost, and the model — out of the way behind ⚙ ----
+  const paintSettings = () => {
+    ui.settings.style.display = S.settingsOpen ? '' : 'none'
+    ui.cog.classList.toggle('on', !!S.settingsOpen)
+    const model = MODELS.find(([v]) => v === chosenModel())?.[1] || 'prompt or farm default'
+    ui.cog.title = `Settings: microphone, boost and the model that writes (now: ${model})`
+  }
+  ui.cog.onclick = () => {
+    S.settingsOpen = !S.settingsOpen
+    paintSettings()
+  }
+
+  // ---- asking about the question (0.9.0) ----
+  // Questions on a wiki are a line long and lean on terms the page assumes.
+  // Before speaking, the author can ask: Tell me more, Research this, or a
+  // question of their own. Each goes to the farm's model with the question's
+  // context — where the page asks it, the page, what has been said — and the
+  // text of the pages the farm's search finds like it, which are listed too, to
+  // open beside the tool. Answers belong to their question, as drafts do: kept
+  // in the session and in this browser under <item>|ask:<question>.
+  const KIND_LABEL = { more: 'Tell me more', research: 'Research this' }
+  S.asks ||= {}
+  const askKey = () => `${item.id}|ask:${slugify(S.title || '')}`
+  const askFor = (key = askKey()) => {
+    if (!S.asks[key]) {
+      const A = (S.asks[key] = {})
+      voice.loadDraft(key).then(found => {
+        if (found && A.answer === undefined && !A.similar) {
+          const { savedAt: _at, ...kept } = found
+          Object.assign(A, kept)
+        }
+        paintAsk()
+      })
+    }
+    return S.asks[key]
+  }
+  const keepAsk = (key, A) =>
+    voice.saveDraft(key, { answer: A.answer, model: A.model, kind: A.kind, asked: A.asked, web: A.web, similar: A.similar, similarHow: A.similarHow, similarFor: A.similarFor, status: A.answer ? A.status : '' })
+
+  // Every link names its site, this one included: the Voice Tool is a plugin page,
+  // and a bare link would be looked for from its context, not the farm's.
+  const pageLink = p => {
+    const site = p.site || location.host
+    return `<a class="internal" href="//${esc(site)}/${esc(p.slug)}.html" data-page-name="${esc(p.slug)}" data-site="${esc(site)}" title="${esc(p.synopsis)}">${esc(p.title)}</a>`
+  }
+  const paintAsk = () => {
+    const A = askFor()
+    const notOwner = voice.ownerHere() === false
+    for (const b of [ui.askMore, ui.askResearch, ui.askGo]) {
+      b.disabled = !!A.busy || notOwner
+      b.dataset.tip ||= b.title
+      b.title = notOwner ? `log in to ${location.host} as its owner to ask` : b.dataset.tip
+    }
+    ui.askSimilar.disabled = !!A.searching || !!A.busy
+    ui.askStatus.textContent = A.status || ''
+    ui.askNote.textContent = A.busy ? '· working…' : A.answer ? '· answer ready' : A.similar?.length ? `· ${A.similar.length} similar pages` : ''
+    const sim = A.similar
+    const simHtml = !sim
+      ? ''
+      : sim.length
+        ? `<div style="color:#555;">Pages on this farm like the question${A.similarHow === 'keyword' ? ' (by keyword — the search by meaning is down)' : ''} — click to open beside the tool:</div>${sim.map(p => `<div>${pageLink(p)} <span class="site">${esc(p.site)}</span></div>`).join('')}`
+        : '<div style="color:#777;">Nothing like this question on the farm yet.</div>'
+    if (ui.similar.dataset.html !== simHtml) {
+      ui.similar.innerHTML = simHtml
+      ui.similar.dataset.html = simHtml
+    }
+    const ansHtml = A.answer ? `<div style="color:#666; font-style:italic;">${esc(A.asked || '')}</div>${answerHtml(A.answer)}` : ''
+    if (ui.answer.dataset.html !== ansHtml) {
+      ui.answer.innerHTML = ansHtml
+      ui.answer.dataset.html = ansHtml
+    }
+    ui.answer.style.display = ui.askActions.style.display = A.answer ? '' : 'none'
+  }
+  // Open or folded as the author left it, across a redraw of the tool.
+  ui.ask.open = !!S.askOpen
+  ui.ask.addEventListener('toggle', () => (S.askOpen = ui.ask.open))
+
+  const askGuard = (A, fn) => async () => {
+    try {
+      await fn()
+    } catch (err) {
+      A.status = 'error: ' + err.message
+    } finally {
+      clearInterval(A.tick)
+      A.busy = A.searching = false
+      paintAsk()
+    }
+  }
+  const findSimilar = async (A, { fresh = false } = {}) => {
+    const question = S.title.trim()
+    if (!fresh && A.similar && A.similarFor === question) return A.similar
+    A.searching = true
+    A.status = 'searching the farm for similar pages…'
+    paintAsk()
+    const t = subject()
+    const found = await voice.similarPages(question, { exclude: t ? [`${voice.siteOf(t.$page)}/${t.slug}`] : [] })
+    A.similar = [...found]
+    A.similarHow = found.how
+    A.similarFor = question
+    A.searching = false
+    return A.similar
+  }
+  const askIt = kind => {
+    const key = askKey()
+    const A = askFor(key)
+    return askGuard(A, async () => {
+      const question = S.title.trim()
+      if (!question) throw new Error('name the question first, in the Question box')
+      const own = ui.askOwn.value.trim()
+      if (kind === 'own' && !own) throw new Error('type your question in the box first')
+      if (voice.ownerHere() === false) throw new Error(`log in to ${location.host} as its owner — the farm asks a model only for the owner`)
+      A.busy = true
+      let related = []
+      let searchNote = ''
+      try {
+        related = await voice.withText(await findSimilar(A), 4)
+      } catch (e) {
+        searchNote = ` · no similar pages (${e.message})`
+      }
+      const t0 = Date.now()
+      const what = kind === 'research' ? 'researching' : 'asking'
+      const tick = () => {
+        A.status = `${what}… ${Math.round((Date.now() - t0) / 1000)} s`
+        paintAsk()
+      }
+      tick()
+      A.tick = setInterval(tick, 1000)
+      const t = subject()
+      const out = await voice.askAbout({
+        question,
+        kind,
+        ask: own,
+        pageTitle: t?.title || '',
+        pageText: t ? voice.pageText(t.$page) : '',
+        context: t ? voice.questionContext(t.$page, question) : '',
+        related: related.map(({ site, slug, title, synopsis, text }) => ({ site, slug, title, synopsis, text })),
+        transcript: S.draft?.transcript?.text || '',
+        model: chosenModel(),
+      })
+      const secs = Math.round((Date.now() - t0) / 1000)
+      const how = out.web ? ', web search allowed' : kind !== 'more' ? ', from the wiki pages only (no web search on this model)' : ''
+      const read = related.length ? ` · read ${Math.min(4, related.length)} similar page${related.length === 1 ? '' : 's'}` : ''
+      Object.assign(A, { answer: out.markdown, model: out.model, kind, web: !!out.web, asked: kind === 'own' ? own : KIND_LABEL[kind] })
+      A.status = `answered in ${secs} s by ${wroteIt(out)}${how}${read}${searchNote}`
+      keepAsk(key, A)
+    })()
+  }
+  ui.askMore.onclick = () => askIt('more')
+  ui.askResearch.onclick = () => askIt('research')
+  ui.askGo.onclick = () => askIt('own')
+  ui.askOwn.onkeydown = e => {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault()
+      ui.askGo.click()
+    }
+  }
+  ui.askSimilar.onclick = () => {
+    const key = askKey()
+    const A = askFor(key)
+    askGuard(A, async () => {
+      const found = await findSimilar(A, { fresh: true })
+      A.status = found.length ? `${found.length} similar page${found.length === 1 ? '' : 's'} — open one beside the tool` : ''
+      keepAsk(key, A)
+    })()
+  }
+  ui.askCopy.onclick = async () => {
+    const A = askFor()
+    try {
+      await navigator.clipboard.writeText(A.answer || '')
+      A.status = 'the answer is on the clipboard'
+    } catch {
+      A.status = 'the browser did not allow copying'
+    }
+    paintAsk()
+  }
+  ui.askClear.onclick = () => {
+    const key = askKey()
+    const A = askFor(key)
+    Object.assign(A, { answer: undefined, asked: '', status: '' })
+    keepAsk(key, A)
+    paintAsk()
+  }
+  // The answer as a ghost page beside the tool: its points to drag where they help, or save.
+  ui.askGhost.onclick = () => {
+    const A = askFor()
+    if (!A.answer) return
+    const question = S.title.trim().replace(/\s+/g, ' ')
+    const t = subject()
+    const items = voice.splitMarkdown(A.answer).map(text => ({ type: 'markdown', id: voice.randomId(), text }))
+    const see = [t?.title, ...(A.similar || []).filter(p => !p.site || p.site === location.host).slice(0, 4).map(p => p.title)].filter(Boolean)
+    if (see.length) items.push({ type: 'markdown', id: voice.randomId(), text: `# See\n\n${[...new Set(see)].map(x => `- [[${x}]]`).join('\n')}` })
+    voice.openGhost(ownPage(ui.$item), `${question.replace(/[?.!]+$/, '')} — Background`, items)
+    A.status = 'opened the answer as a ghost page — drag from it, rename it, or save it'
+    paintAsk()
+  }
+
   paint()
   ui.$item.on('mouseenter', paint) // the lineup settles, and changes, after bind
 
@@ -1257,7 +1641,7 @@ function bindVoice($item, item) {
   if (!S.loaded) {
     S.loaded = true
     voice.loadDraft(item.id).then(found => {
-      if (!found?.blob || S.draft) return
+      if (!(found?.blob || found?.transcript) || S.draft) return
       if (S.titleTouched && found.titleTouched && slugify(found.title) !== slugify(S.title)) {
         // the Plan Tool handed over another question before the store answered
         const { parkedAs: _parked, ...kept } = found
@@ -1269,7 +1653,7 @@ function bindVoice($item, item) {
       S.draft = draft
       if (titleTouched) Object.assign(S, { title, titleTouched })
       const when = new Date(savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      say(draft.transcript ? `picked up your unsaved recording from ${when} — nothing was lost` : `picked up your recording from ${when} — it has no transcript yet, press ↻ Transcribe`)
+      say(draft.typed ? `picked up your unsaved typed answer from ${when}` : draft.transcript ? `picked up your unsaved recording from ${when} — nothing was lost` : `picked up your recording from ${when} — it has no transcript yet, press ↻ Transcribe`)
       paint()
     })
   }
@@ -1288,18 +1672,18 @@ function bindVoice($item, item) {
 
   // Back to the beginning. Nothing was stored, so there is nothing to delete —
   // unless the audio was deliberately kept, and then it stays where it was put.
-  const startOver = () => {
+  const startOver = ({ keepQuestion = false } = {}) => {
     const kept = S.draft?.kept
     if (S.blobUrl) URL.revokeObjectURL(S.blobUrl)
     ui.player.removeAttribute('src')
     ui.preview.value = ''
-    Object.assign(S, { draft: null, blobUrl: null, $ghost: null, titleTouched: false })
+    Object.assign(S, { draft: null, blobUrl: null, $ghost: null, ...(keepQuestion ? {} : { titleTouched: false }) })
     working(null)
     voice.clearDraft(item.id)
     say(kept ? `cleared — the audio you kept is still in assets/${kept.folder}` : 'cleared — speak, or drop a recording')
     paint()
   }
-  ui.clear.onclick = startOver
+  ui.clear.onclick = () => startOver()
 
   // The farm hears a draft's recording. Kept apart from taking the recording so
   // a draft that still has its audio but no transcript — the farm refused, the
@@ -1337,7 +1721,6 @@ function bindVoice($item, item) {
     }
     draft.transcript = transcript
     persist()
-    ui.tbox.open = true
     say(`transcribed ${Math.round(transcript.duration || 0)}s in ${transcript.elapsed ?? '?'}s on ${where(transcript)} — choose a prompt and summarise`)
     paint()
   }
@@ -1347,7 +1730,8 @@ function bindVoice($item, item) {
 
   // one recording, from the microphone or a file, through to a transcript
   const hear = async (blob, type, name) => {
-    if (S.draft) startOver()
+    if (S.draft) startOver({ keepQuestion: true }) // a new take for the same question
+    S.typing = false
     const draft = (S.draft = { blob, type, name })
     persist() // the recording is safe before the farm is even asked
     await transcribeDraft(draft)
@@ -1402,6 +1786,51 @@ function bindVoice($item, item) {
     hearFile(file)
   })
 
+  // ---- typing instead of speaking ----
+  // Where speaking is not appropriate the answer is typed. The words take the
+  // transcript's place in the draft (typed: true, no recording), so the stages
+  // carry on as for speech: Summarise them through a prompt, or Use as written.
+  ui.type.onclick = () => {
+    S.typing = true
+    S.typedText = S.draft?.typed ? S.draft.transcript.text : S.typedText || ''
+    say('')
+    paint()
+    ui.typed.focus()
+  }
+  ui.typed.oninput = () => (S.typedText = ui.typed.value)
+  ui.typed.onkeydown = e => {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault()
+      ui.typedDone.click()
+    }
+  }
+  ui.typedCancel.onclick = () => {
+    S.typing = false
+    paint()
+  }
+  ui.typedDone.onclick = guard(async () => {
+    const text = (S.typedText || ui.typed.value || '').trim()
+    if (!text) throw new Error('type your answer first')
+    if (S.draft) startOver({ keepQuestion: true })
+    S.draft = { typed: true, name: timestampName('typed', 'txt'), transcript: { text, typed: true, provider: 'typed' } }
+    S.typing = false
+    S.typedText = ''
+    persist()
+    say(`took ${text.split(/\s+/).length} words as your answer — use them as written, or summarise them`)
+    paint()
+  })
+  // The words as they are become the notes: no model, nothing spent.
+  ui.aswritten.onclick = guard(async () => {
+    const d = S.draft
+    if (!d?.transcript?.text) return
+    d.summary = { model: 'as written', promptTitle: '', promptFrom: '', section: '' }
+    d.summaryText = d.transcript.text.trim()
+    ui.preview.value = d.summaryText
+    persist()
+    say('the words are the notes — edit them if you like, then save')
+    paint()
+  })
+
   ui.summarise.onclick = guard(async () => {
     const draft = S.draft
     if (!draft?.transcript) return
@@ -1446,7 +1875,7 @@ function bindVoice($item, item) {
   const items = kept =>
     voice.spokenItems({
       markdown: S.draft.summaryText,
-      transcript: S.draft.transcript.text,
+      transcript: S.draft.typed ? '' : S.draft.transcript.text,
       title: S.title.trim().replace(/\s+/g, ' '),
       subjectTitle: subject()?.title || '',
       promptTitle: S.draft.summary?.promptTitle || '',
@@ -1465,7 +1894,7 @@ function bindVoice($item, item) {
   ui.ghost.onclick = guard(async () => {
     if (S.draft?.summaryText === undefined) return
     const { title, kept } = await showGhost()
-    say(`opened “${title}” — drag items from it, rename it on the page, or save it${kept ? '' : '; the recording was not kept'}`)
+    say(`opened “${title}” — drag items from it, rename it on the page, or save it${kept || S.draft.typed ? '' : '; the recording was not kept'}`)
     paint()
   })
 
@@ -1481,13 +1910,18 @@ function bindVoice($item, item) {
     S.saving = true
     paint()
     try {
+      // With "keep the audio" ticked the recording is uploaded first, and its
+      // player goes onto the page straight after the notes it belongs to.
+      const kept = await keepIfAsked()
       const done = await voice.addToPage(t.$page, S.draft.summaryText, { section })
+      if (kept) await voice.addItem(t.$page, done.last, voice.keptAudioItem(kept, S.title.trim().replace(/\s+/g, ' ')))
+      const player = kept ? `, with the audio player (assets/${kept.folder})` : ''
       say(
-        done.how === 'replaced'
+        (done.how === 'replaced'
           ? `filled the ${section} template on ${t.title}`
           : done.how === 'section'
             ? `added ${done.count} item${done.count === 1 ? '' : 's'} at the end of ${section} on ${t.title}`
-            : `added ${done.count} item${done.count === 1 ? '' : 's'} to ${t.title}${section ? ` (no ${section} heading there)` : ''}`,
+            : `added ${done.count} item${done.count === 1 ? '' : 's'} to ${t.title}${section ? ` (no ${section} heading there)` : ''}`) + player,
       )
     } finally {
       S.saving = false
@@ -1537,7 +1971,7 @@ function bindVoice($item, item) {
   })
 
   ui.$item.on('dblclick', e => {
-    if ($(e.target).closest('button, select, audio, canvas, textarea, details, input, label').length) return
+    if ($(e.target).closest('button, select, audio, canvas, textarea, details, input, label, a, .an-settings').length) return
     wiki.textEditor($item, item)
   })
 }
