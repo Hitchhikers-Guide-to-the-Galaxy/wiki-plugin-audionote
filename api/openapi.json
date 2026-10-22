@@ -263,6 +263,20 @@
           }
         }
       }
+    },
+    "/models.json": {
+      "get": {
+        "operationId": "models",
+        "summary": "Which model the Voice Tool uses when none is chosen",
+        "description": "The farm's default model for Summarise and Ask (CLAUDE_DOOR_MODEL, or AUDIONOTE_SUMMARY_MODEL, else claude-opus-5), where it was set, and the fallback tried when it cannot be reached. The Voice Tool's ⚙ chip names it before anything is run.",
+        "x-fedwiki-read-only": true,
+        "x-fedwiki-context": [],
+        "responses": {
+          "200": {
+            "description": "{default, defaultFrom, fallback}"
+          }
+        }
+      }
     }
   }
 }

@@ -814,6 +814,7 @@ function promptPicker(selectOf, item, S) {
       S.prompts.map((p, i) => `<option value="${i}">${esc(p.title)} — ${esc(p.kind || 'prompt')} · ${p.local ? 'forked here' : esc(p.from)}</option>`).join('')
     select.value = S.promptChoice ?? String(S.prompts.findIndex(p => p.title.toLowerCase() === wanted.toLowerCase()))
     select.onchange = () => (S.promptChoice = select.value)
+    select.dispatchEvent(new CustomEvent('an-prompts')) // the prompts arrived: the ⚙ chip may now name a prompt's model
   }
   if (S.prompts) paintPrompts()
   else {
@@ -891,6 +892,7 @@ function bindModel(root) {
     try {
       localStorage.setItem(MODEL_KEY, select.value)
     } catch {}
+    window.dispatchEvent(new CustomEvent('audionote:model', { detail: select.value })) // every tool on the page repaints its chip
   }
   return () => select.value
 }
@@ -947,7 +949,11 @@ const VOICE_CSS = `
 .an-voice .an-step { flex:1; text-align:center; padding:2px 0; border-radius:3px; background:#dcdcdc; color:#777; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .an-voice .an-step.done { background:#d4ecd9; color:#1a7f37; }
 .an-voice .an-step.now { background:#2f6fcf; color:#fff; font-weight:bold; }
-.an-voice .an-next { font-size:.82em; color:#2559a8; margin-top:3px; }
+.an-voice .an-nextrow { display:flex; align-items:baseline; gap:6px; margin-top:3px; }
+.an-voice .an-next { flex:1; min-width:0; font-size:.82em; color:#2559a8; }
+.an-voice .an-chip { flex:0 1 auto; min-width:0; max-width:48%; font-size:.78em; color:#555; text-decoration:none; border:1px solid #ccc; border-radius:10px; padding:0 7px; background:#f7f7f7; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; }
+.an-voice .an-chip:hover { background:#eef4ff; border-color:#9ab; }
+.an-voice .an-chip.chosen { color:#1d4f9a; border-color:#9ab; }
 .an-voice details { margin-top:5px; }
 .an-voice details > summary { cursor:pointer; font-size:.88em; }
 .an-voice .an-box { font-size:.85em; background:#fff; padding:5px 8px; border-radius:4px; max-height:12em; overflow:auto; }
@@ -1025,7 +1031,10 @@ const voiceHtml = item => `
       </div>
     </details>
     <div class="an-steps">${STEPS.map(([k, l]) => `<span class="an-step" data-step="${k}">${l}</span>`).join('')}</div>
-    <div class="an-next"></div>
+    <div class="an-nextrow">
+      <span class="an-next"></span>
+      <a class="an-chip" role="button" tabindex="0" title="The model Summarise asks — click to change it in ⚙ settings"><span aria-hidden="true">⚙</span> <span class="an-chip-name">farm default</span></a>
+    </div>
     <div class="an-row an-typebox" style="display:none;">
       <textarea class="an-typed" placeholder="Type your answer to the question. Then Use this text: Summarise it, or use it as written."></textarea>
       <button class="an-typed-done" title="Take this text as the answer — the next step is to summarise it, or use it as written">Use this text</button>
@@ -1130,7 +1139,7 @@ function bindVoice($item, item) {
     titlebox: el('.an-titlebox'), title: el('.an-title'), red: el('.an-red'),
     levels: el('.an-levels'), busy: el('.an-busy'), meterline: el('.an-meterline'),
     ghost: el('.an-ghost'), add: el('.an-add'), put: el('.an-put'), back: el('.an-back'), status: el('.an-status'),
-    cog: el('.an-cog'), settings: el('.an-settings'), steps: el('.an-steps'), next: el('.an-next'), words: el('.an-words'),
+    cog: el('.an-cog'), chip: el('.an-chip'), chipName: el('.an-chip-name'), settings: el('.an-settings'), steps: el('.an-steps'), next: el('.an-next'), words: el('.an-words'),
     sumrow: el('.an-sumrow'), saverow: el('.an-saverow'), tlabel: el('.an-tlabel'),
     type: el('.an-type'), typebox: el('.an-typebox'), typed: el('.an-typed'), typedDone: el('.an-typed-done'), typedCancel: el('.an-typed-cancel'), aswritten: el('.an-aswritten'),
     ask: el('.an-ask'), askNote: el('.an-ask-note'), askMore: el('.an-ask-more'), askResearch: el('.an-ask-research'),
@@ -1264,6 +1273,7 @@ function bindVoice($item, item) {
     if (document.activeElement !== ui.red) ui.red.value = ''
     paintStage()
     paintSettings()
+    paintChip()
     paintAsk()
     if (S.status) ui.status.textContent = S.status
     findRed(t)
@@ -1470,6 +1480,63 @@ function bindVoice($item, item) {
     S.settingsOpen = !S.settingsOpen
     paintSettings()
   }
+
+  // ---- the model, named before it is used (0.11.0) ----
+  // ⚙ <model> beside the next step: what Summarise will ask — the choice in
+  // ⚙ settings, else the chosen prompt's MODEL line, else the farm's default
+  // (models.json). It repaints when either choice changes, here, in another
+  // Voice Tool on the page, or in another tab.
+  const paintChip = () => {
+    if (!ui.chip) return
+    const prompt = S.prompts?.[+ui.prompt.value] || null
+    const show = m => {
+      const shown = voice.modelShown({ chosen: chosenModel(), prompt, farm: m })
+      ui.chipName.textContent = shown.label
+      ui.chip.title = `${shown.title}.`
+      ui.chip.classList.toggle('chosen', shown.from !== 'farm')
+    }
+    show(S.farmModels)
+    if (!S.farmModels)
+      voice.modelsHere().then(m => {
+        if (!m) return
+        S.farmModels = m
+        show(m)
+      })
+  }
+  const openModel = () => {
+    S.settingsOpen = true
+    paintSettings()
+    $item[0].querySelector('.an-model')?.focus()
+  }
+  ui.chip.onclick = e => {
+    e.preventDefault()
+    if (S.settingsOpen && $item[0].querySelector('.an-model') === document.activeElement) {
+      S.settingsOpen = false
+      return paintSettings()
+    }
+    openModel()
+  }
+  ui.chip.onkeydown = e => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), openModel())
+  const modelSelect = $item[0].querySelector('.an-model')
+  modelSelect?.addEventListener('change', () => (paintSettings(), paintChip()))
+  ui.prompt.addEventListener('change', paintChip)
+  ui.prompt.addEventListener('an-prompts', paintChip)
+  // Another tool on this page, or another tab, changed the choice: follow it.
+  // One pair of listeners per tool: a redraw replaces the last bind's.
+  const unfollow = () => {
+    window.removeEventListener('audionote:model', S.followModel)
+    window.removeEventListener('storage', S.followStorage)
+  }
+  unfollow()
+  S.followModel = () => {
+    if (!$item[0].isConnected) return unfollow()
+    if (modelSelect) modelSelect.value = MODELS.some(([v]) => v === storedModel()) ? storedModel() : ''
+    paintSettings()
+    paintChip()
+  }
+  S.followStorage = e => e.key === MODEL_KEY && S.followModel()
+  window.addEventListener('audionote:model', S.followModel)
+  window.addEventListener('storage', S.followStorage)
 
   // ---- asking about the question (0.9.0) ----
   // Questions on a wiki are a line long and lean on terms the page assumes.

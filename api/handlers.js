@@ -503,4 +503,15 @@ const ask = async (body, { doors = null } = {}) => {
   }
 }
 
-module.exports = { transcribe, hear, job, summarise, ask, askContent, ASK_KINDS, fill, door, engine, fromMacWhisper, macwhisperUp, voiceTier, autoPick, autoLine, AUTO_BIG_TOKENS, AUTO_ROOM }
+// ---------- models (0.11.0): the farm's default, for the Voice Tool's ⚙ chip ----------
+//
+// Read-only and spends nothing: the model Summarise and Ask use when the
+// browser chose none and the prompt names none, where that choice was set,
+// and the fallback tried when it cannot be reached.
+const models = async () => {
+  const { defaultModel, fallbackModel } = await doorReady()
+  const from = ['CLAUDE_DOOR_MODEL', 'AUDIONOTE_SUMMARY_MODEL'].find(n => process.env[n]) || 'the Voice Tool'
+  return { default: defaultModel('claude-opus-5'), defaultFrom: from, fallback: fallbackModel() || null }
+}
+
+module.exports = { transcribe, hear, job, summarise, ask, models, askContent, ASK_KINDS, fill, door, engine, fromMacWhisper, macwhisperUp, voiceTier, autoPick, autoLine, AUTO_BIG_TOKENS, AUTO_ROOM }

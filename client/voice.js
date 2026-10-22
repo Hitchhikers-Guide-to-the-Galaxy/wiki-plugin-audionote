@@ -218,6 +218,52 @@ export const summarise = body => postJson('/system/api/audionote/summarise.json'
 /** Ask a model about the question being answered (0.9.0): {question, kind, ask, pageTitle, pageText, context, related, transcript, model}. */
 export const askAbout = body => postJson('/system/api/audionote/ask.json', body)
 
+// ---------- the model, shown before it is used (0.11.0) ----------
+//
+// The ⚙ chip beside the next step names the model Summarise will ask, as the
+// Plan Tool's chip does: the one chosen in ⚙ settings (kept in this browser),
+// else the prompt's MODEL line, else the farm's default, which models.json
+// tells. A farm without models.json (an older server) leaves "farm default".
+
+/** A short name for a model id: claude-opus-5-5 → "Claude Opus 5.5", openai:llm_auto-big → "coop · auto-big", ollama:qwen3:4b → "Ollama · qwen3:4b". The Plan Tool's modelLabel. */
+export const modelLabel = id => {
+  const m = String(id || '')
+  if (!m) return 'farm default'
+  if (m === 'auto') return 'auto'
+  if (m.startsWith('openai:')) return `coop · ${m.slice(7).replace(/^llm_/, '')}`
+  if (m.startsWith('ollama:')) return `Ollama · ${m.slice(7)}`
+  const c = m.replace(/^claude-cli:/, '').match(/^claude-([a-z]+)-(\d+)(?:-(\d+))?$/)
+  if (c) return `Claude ${c[1][0].toUpperCase()}${c[1].slice(1)} ${c[2]}${c[3] ? `.${c[3]}` : ''}`
+  return m
+}
+
+/**
+ * Which model Summarise will ask, and why: {id, label, from, title}.
+ * `from` is chosen (⚙ settings), prompt (its MODEL line) or farm (the default).
+ * 💬 Ask never reads a prompt, so a prompt's model is named as Summarise's only.
+ */
+export const modelShown = ({ chosen = '', prompt = null, farm = null } = {}) => {
+  const farmId = farm?.default || ''
+  const farmName = farmId ? modelLabel(farmId) : 'the farm default'
+  if (chosen === 'auto') return { id: 'auto', label: 'auto', from: 'chosen', title: 'Auto, chosen in ⚙ settings: the farm picks a model by the size of each question — the status line says which' }
+  if (chosen) return { id: chosen, label: modelLabel(chosen), from: 'chosen', title: `${chosen}, chosen in ⚙ settings and kept in this browser — Summarise and 💬 Ask use it` }
+  if (prompt?.model)
+    return { id: prompt.model, label: modelLabel(prompt.model), from: 'prompt', title: `${prompt.model}, the MODEL line of the prompt “${prompt.title}” — Summarise uses it; 💬 Ask uses ${farmName}. Change it in ⚙ settings` }
+  return {
+    id: farmId,
+    label: farmId ? modelLabel(farmId) : 'farm default',
+    from: 'farm',
+    title: `${farmId || 'The farm default'}${farm?.defaultFrom ? `, set by ${farm.defaultFrom}` : ''} — nothing is chosen in ⚙ settings. Change it there`,
+  }
+}
+
+// models.json once a page load: the farm's default, for the chip.
+let farmModels = null
+export const modelsHere = () =>
+  (farmModels ||= fetch('/system/api/audionote/models.json', { cache: 'no-store' })
+    .then(res => (res.ok ? res.json() : null))
+    .catch(() => null))
+
 // ---------- pages like the question (0.9.0) ----------
 //
 // The farm's own search (the Similarity plugin) finds pages that may already
