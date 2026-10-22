@@ -384,7 +384,21 @@ const autoPick = async (content, { system = SYSTEM, doors = null } = {}) => {
   return { ...auto, line: autoLine(auto) }
 }
 
-const summarise = async ({ transcript, pageTitle, pageText, title, prompt, model }, { doors = null } = {}) => {
+// What 💬 Ask found about the question, sent with Summarise when the author
+// leaves "Include the research" ticked (0.12.0): background for the summary,
+// never mistaken for the author's words.
+const RESEARCH_CAP = 40000
+const researchBlock = (research, asked = '') => {
+  const r = String(research || '').trim().slice(0, RESEARCH_CAP)
+  if (!r) return ''
+  const what = String(asked || '').trim().slice(0, 300)
+  return (
+    `\n\n<research note="before answering, the author asked a model about the question${what ? ` (${what.replace(/"/g, "'")})` : ''}; its reply is background, not the author's words">\n${r}\n</research>\n\n` +
+    'Draw on the research above where the author\'s words point to it or leave a gap it fills, and say when a point comes from it rather than from the author. The summary is still of what the author said.'
+  )
+}
+
+const summarise = async ({ transcript, pageTitle, pageText, title, prompt, model, research, researchAsked }, { doors = null } = {}) => {
   const t = String(transcript || '').trim()
   if (!t) throw problem(400, 'there is no transcript to summarise')
   const { MODEL_ID, defaultModel, fallbackModel } = await doorReady()
@@ -401,7 +415,7 @@ const summarise = async ({ transcript, pageTitle, pageText, title, prompt, model
     page_text: String(pageText || '').slice(0, 200000),
     title: String(title || '').trim(), // the page the words will be saved under, often a red link's question
     date: new Date().toISOString().slice(0, 10),
-  })
+  }) + researchBlock(research, researchAsked)
   let picked = null
   if (auto) {
     picked = await autoPick(content, { doors })
@@ -514,4 +528,4 @@ const models = async () => {
   return { default: defaultModel('claude-opus-5'), defaultFrom: from, fallback: fallbackModel() || null }
 }
 
-module.exports = { transcribe, hear, job, summarise, ask, models, askContent, ASK_KINDS, fill, door, engine, fromMacWhisper, macwhisperUp, voiceTier, autoPick, autoLine, AUTO_BIG_TOKENS, AUTO_ROOM }
+module.exports = { transcribe, hear, job, summarise, ask, models, researchBlock, askContent, ASK_KINDS, fill, door, engine, fromMacWhisper, macwhisperUp, voiceTier, autoPick, autoLine, AUTO_BIG_TOKENS, AUTO_ROOM }

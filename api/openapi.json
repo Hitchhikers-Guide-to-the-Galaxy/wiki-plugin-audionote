@@ -124,6 +124,14 @@
                   "model": {
                     "type": "string",
                     "description": "claude-<id> for the Claude API, claude-cli:claude-<id> for the Claude Code CLI under the account logged in on the farm machine (a Max subscription, no API key), ollama:<name> for an Ollama model, openai:<name> for a model behind the coop's OpenAI-compatible door, or auto to let the farm pick per summary by the question's size: Claude Fable 5.1 over AUDIONOTE_AUTO_BIG_TOKENS (48k), else the coop's own routing (llm_auto-big), and Claude when the coop is down; the pick and its reason come back as `auto`. Default CLAUDE_DOOR_MODEL (AUDIONOTE_SUMMARY_MODEL), else claude-opus-5; CLAUDE_DOOR_FALLBACK_MODEL (AUDIONOTE_FALLBACK_MODEL) is tried when the first cannot be reached."
+                  },
+                  "research": {
+                    "type": "string",
+                    "description": "What 💬 Ask answered about the question (0.12.0), sent when the author leaves Include the research ticked: appended to the prompt as background in <research> tags, with the rule that the summary draws on it where the author's words point to it, says when a point comes from it, and stays a summary of what the author said. Up to 40,000 characters."
+                  },
+                  "researchAsked": {
+                    "type": "string",
+                    "description": "What was asked to get the research (Tell me more, Research this, or the author's own question)."
                   }
                 }
               }

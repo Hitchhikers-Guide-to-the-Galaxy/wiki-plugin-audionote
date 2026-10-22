@@ -905,8 +905,9 @@ const wroteIt = out => {
 }
 
 /** A transcript through a prompt (or the built-in plain summary) on the farm. */
-const summaryFor = ({ transcript, $page, prompt, title = '', model = '' }) =>
+const summaryFor = ({ transcript, $page, prompt, title = '', model = '', research = null }) =>
   voice.summarise({
+    ...(research ? { research: research.text, researchAsked: research.asked } : {}),
     transcript,
     pageTitle: $page ? pageTitle($page) : '',
     pageText: $page ? voice.pageText($page) : '',
@@ -1025,6 +1026,7 @@ const voiceHtml = item => `
       <div class="an-similar"></div>
       <div class="an-box an-ask-answer" style="display:none; margin-top:5px; max-height:16em;"></div>
       <div class="an-row an-ask-actions" style="display:none;">
+        <button class="an-ask-use" title="Add this answer to your own words: to what you are typing, to the words waiting to be summarised, or to the end of your notes — whichever you are at">+ Add to my answer</button>
         <button class="an-ask-ghost" title="Open the answer as a ghost page beside the tool — drag from it, or save it">Open as ghost page</button>
         <button class="an-ask-copy">Copy</button>
         <button class="an-ask-clear" title="Forget this answer">✕</button>
@@ -1060,6 +1062,7 @@ const voiceHtml = item => `
       <button class="an-summarise" disabled>Summarise</button>
       <button class="an-aswritten" title="Use the words as they are, without a model: they become the notes, ready to edit and save">✓ Use as written</button>
     </div>
+    <label class="an-research" style="display:none; font-size:.82em; margin-top:2px; color:#2a6;" title="Send the answer 💬 Ask gave for this question with the summary, as background: the summary draws on it where your words point to it, and says when a point comes from it rather than from you"><input type="checkbox" class="an-research-use"> Include the research (💬 Ask) when summarising</label>
     <div class="an-took" style="font-size:.8em; color:#666; margin-top:2px;" title="how long the last summary took, from this browser"></div>
     <textarea class="an-preview" rows="6" placeholder="The summary appears here to read and edit."
       style="width:100%; box-sizing:border-box; margin-top:5px; font-size:.85em; height:9em; resize:vertical; display:none;"></textarea>
@@ -1145,7 +1148,8 @@ function bindVoice($item, item) {
     ask: el('.an-ask'), askNote: el('.an-ask-note'), askMore: el('.an-ask-more'), askResearch: el('.an-ask-research'),
     askSimilar: el('.an-ask-similar'), askOwn: el('.an-ask-own'), askGo: el('.an-ask-go'), askStatus: el('.an-ask-status'),
     similar: el('.an-similar'), answer: el('.an-ask-answer'), askActions: el('.an-ask-actions'),
-    askGhost: el('.an-ask-ghost'), askCopy: el('.an-ask-copy'), askClear: el('.an-ask-clear'),
+    askGhost: el('.an-ask-ghost'), askCopy: el('.an-ask-copy'), askClear: el('.an-ask-clear'), askUse: el('.an-ask-use'),
+    research: el('.an-research'), researchUse: el('.an-research-use'),
     $item,
   }
   voiceStyle()
@@ -1243,7 +1247,7 @@ function bindVoice($item, item) {
     const heard = d?.transcript ? d.transcript.text || '' : ''
     ui.transcript.textContent = d?.transcript ? heard || '(nothing was heard)' : ''
     ui.words.textContent = heard ? `· ${heard.split(/\s+/).filter(Boolean).length} words` : ''
-    ui.tlabel.textContent = d?.typed ? 'What you typed' : 'Transcript'
+    ui.tlabel.textContent = (d?.typed ? 'What you typed' : 'Transcript') + (d?.added ? ' + the research you added' : '')
     ui.sumrow.style.display = d?.transcript ? 'flex' : 'none'
     ui.summarise.disabled = !heard || S.summarising
     const summarised = d?.summaryText !== undefined
@@ -1251,6 +1255,10 @@ function bindVoice($item, item) {
     ui.keepbox.style.display = summarised && d?.blob ? '' : 'none' // typed words have no audio to keep
     ui.aswritten.disabled = !heard || S.summarising
     ui.saverow.style.display = summarised ? 'flex' : 'none'
+    // The research for this question rides along with Summarise, unless unticked (0.12.0).
+    const R = askFor()
+    ui.research.style.display = d?.transcript && R.answer && !summarised ? '' : 'none'
+    ui.researchUse.checked = R.include !== false
     if (summarised && document.activeElement !== ui.preview && ui.preview.value !== d.summaryText) ui.preview.value = d.summaryText
     ui.keep.checked = !!d?.keep
     ui.keep.disabled = !!d?.kept
@@ -1563,7 +1571,7 @@ function bindVoice($item, item) {
     return S.asks[key]
   }
   const keepAsk = (key, A) =>
-    voice.saveDraft(key, { answer: A.answer, model: A.model, kind: A.kind, asked: A.asked, web: A.web, similar: A.similar, similarHow: A.similarHow, similarFor: A.similarFor, status: A.answer ? A.status : '' })
+    voice.saveDraft(key, { answer: A.answer, model: A.model, kind: A.kind, asked: A.asked, web: A.web, similar: A.similar, similarHow: A.similarHow, similarFor: A.similarFor, include: A.include, status: A.answer ? A.status : '' })
 
   // Every link names its site, this one included: the Voice Tool is a plugin page,
   // and a bare link would be looked for from its context, not the farm's.
@@ -1690,6 +1698,38 @@ function bindVoice($item, item) {
       A.status = found.length ? `${found.length} similar page${found.length === 1 ? '' : 's'} — open one beside the tool` : ''
       keepAsk(key, A)
     })()
+  }
+  // + Add to my answer (0.12.0): the answer joins the author's own words,
+  // wherever they are now — the typing box, the words waiting to be
+  // summarised, or the notes — and the status says which.
+  const joinWords = (had, more) => [String(had || '').trim(), String(more || '').trim()].filter(Boolean).join('\n\n')
+  ui.askUse.onclick = () => {
+    const A = askFor()
+    if (!A.answer) return
+    const d = S.draft
+    if (S.typing || !d) {
+      S.typedText = joinWords(S.typing ? ui.typed.value : d?.typed ? d.transcript.text : S.typedText, A.answer)
+      S.typing = true
+      A.status = 'added to what you are typing — edit it, then Use this text'
+    } else if (d.summaryText !== undefined) {
+      d.summaryText = joinWords(ui.preview.value || d.summaryText, A.answer)
+      ui.preview.value = d.summaryText
+      persist()
+      A.status = 'added to the end of your notes'
+    } else if (d.transcript) {
+      d.transcript = { ...d.transcript, text: joinWords(d.transcript.text, A.answer) }
+      d.added = true
+      persist()
+      A.status = 'added to the words waiting to be summarised'
+    }
+    paint()
+    if (S.typing) ui.typed.focus()
+  }
+  ui.researchUse.onchange = () => {
+    const key = askKey()
+    const A = askFor(key)
+    A.include = ui.researchUse.checked
+    keepAsk(key, A)
   }
   ui.askCopy.onclick = async () => {
     const A = askFor()
@@ -1930,8 +1970,10 @@ function bindVoice($item, item) {
     paint()
     try {
       const model = ui.summarise.closest('.item')?.querySelector('.an-model')?.value || ''
+      const R = askFor()
+      const research = R.answer && R.include !== false ? { text: R.answer, asked: R.asked || '' } : null
       const out = await timed(ui.summarise.closest('.item'), () =>
-        summaryFor({ transcript: draft.transcript.text, $page: t?.$page, prompt: p, title: S.title, model }),
+        summaryFor({ transcript: draft.transcript.text, $page: t?.$page, prompt: p, title: S.title, model, research }),
       )
       const summary = { model: out.model, promptTitle: p?.title, promptFrom: p && !p.local ? p.from : '', section: p?.section || '' } // where the prompt was read from, to fork in on save
       if (S.draft !== draft) return draft.parkedAs && landParked(Object.assign(draft, { summary, summaryText: out.markdown }))
@@ -1939,7 +1981,7 @@ function bindVoice($item, item) {
       draft.summaryText = out.markdown
       ui.preview.value = out.markdown
       persist()
-      say(`summary by ${wroteIt(out)} — edit it, name the page, then open or save it`)
+      say(`summary by ${wroteIt(out)}${research ? ', drawing on the research' : ''} — edit it, name the page, then open or save it`)
     } finally {
       S.summarising = false
       working(null)
